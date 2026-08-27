@@ -2,8 +2,8 @@
 
 Two machines, two backends, two datasets:
 
-  advanced  settings.jsonl     -- the current API (api.py), Formula Pro Advanced
-  pro       legacy_pro.jsonl   -- the retired backend (legacy_api.py), original
+  advanced  data/raw/settings.jsonl     -- the current API (crawlers/api.py), Formula Pro Advanced
+  pro       data/raw/legacy_pro.jsonl   -- the retired backend (crawlers/legacy_api.py), original
                                   Formula Pro (FRP0045)
 
 The current API filters each record's `territory` array down to the territory
@@ -18,12 +18,12 @@ for formulas it cannot dispense; the Advanced's says 0, which is not a position
 on a dial that runs 1-10.  Both are answers, not gaps, and neither is coerced
 into a usable number.
 """
-import json, os, re, sys
+import datetime, json, os, re, sys
 from collections import defaultdict
-from api import BASE, IMAGE_BASE
-from legacy_api import BASE as LEGACY_BASE
+from crawlers.api import BASE, IMAGE_BASE
+from crawlers.legacy_api import BASE as LEGACY_BASE
 
-OUT = "formula_settings.json"
+OUT = "site/data/formula_settings.json"
 
 
 def norm_setting(v):
@@ -34,7 +34,7 @@ def norm_setting(v):
     return int(s) if re.fullmatch(r"\d+", s) else (s.upper() or None)
 
 
-def load_advanced(path="settings.jsonl"):
+def load_advanced(path="data/raw/settings.jsonl"):
     rows, stats = [], defaultdict(int)
     if not os.path.exists(path):
         return rows, dict(stats)
@@ -59,7 +59,7 @@ def load_advanced(path="settings.jsonl"):
     return rows, dict(stats)
 
 
-def load_pro(path="legacy_pro.jsonl"):
+def load_pro(path="data/raw/legacy_pro.jsonl"):
     rows, stats = [], defaultdict(int)
     if not os.path.exists(path):
         return rows, dict(stats)
@@ -106,7 +106,7 @@ def merge(rows):
     return out
 
 
-def attach_alt(records, path="alt_settings.jsonl"):
+def attach_alt(records, path="data/raw/alt_settings.jsonl"):
     """Attach the lot-number alternate setting where it differs.
 
     Baby Brezza asks Formula Pro Advanced and Advanced WiFi owners for the
@@ -140,7 +140,7 @@ def attach_alt(records, path="alt_settings.jsonl"):
     return n
 
 
-def attach_dates(records, path="image_dates.jsonl"):
+def attach_dates(records, path="data/raw/image_dates.jsonl"):
     """Attach each Advanced record's image date as a freshness signal.
 
     Nothing in the settings API carries a timestamp.  Every Advanced record
@@ -208,7 +208,18 @@ def main():
             "newest": max((r.get("updated", "") for r in rs), default="") or None,
         }
 
+    model_counts = {m: counts(m) for m in ("advanced", "pro")}
+
     data = {
+        # Top-level provenance so a diff of the versioned snapshot is self-describing.
+        "generated": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+        "counts": {
+            **{m: c["records"] for m, c in model_counts.items()},
+            "records": len(records),
+            "conflicts": len(conflicts),
+            "with_alt_setting": n_alt,
+            "dated": n_dated,
+        },
         "models": {
             "advanced": {
                 "label": "Formula Pro Advanced",
@@ -217,7 +228,7 @@ def main():
                         "Enter your lot number below if it starts with 11 — 99 formulas "
                         "have a second setting for those machines. The Mini never uses it.",
                 "source": BASE,
-                "counts": counts("advanced"),
+                "counts": model_counts["advanced"],
             },
             "pro": {
                 "label": "Formula Pro (original)",
@@ -227,7 +238,7 @@ def main():
                         "changed on the live one since. No barcodes, no lot-number "
                         "variants. Treat these numbers as a starting point.",
                 "source": LEGACY_BASE,
-                "counts": counts("pro"),
+                "counts": model_counts["pro"],
             },
         },
         "image_base": IMAGE_BASE,
@@ -235,6 +246,7 @@ def main():
         "conflicts": conflicts,
         "records": records,
     }
+    os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     for m, meta in data["models"].items():

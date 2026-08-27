@@ -9,8 +9,8 @@ would be the one bug that actually matters here.
 """
 import json, os
 
-DATA = "formula_settings.json"
-OUT = "page.html"
+DATA = "site/data/formula_settings.json"
+OUT = "site/index.html"
 
 
 def pack(data):
@@ -700,6 +700,7 @@ def main():
     html = (TEMPLATE
             .replace("__DATA__", json.dumps(packed, ensure_ascii=False, separators=(",", ":")))
             .replace("__QUICK__", json.dumps(quick, ensure_ascii=False)))
+    os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         f.write(html)
     print(f"wrote {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB), "

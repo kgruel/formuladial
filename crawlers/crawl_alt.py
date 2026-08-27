@@ -23,7 +23,7 @@ import json, os, threading
 from concurrent.futures import ThreadPoolExecutor
 from api import get, EmptyResponse
 
-OUT = "alt_settings.jsonl"
+OUT = "data/raw/alt_settings.jsonl"
 lock = threading.Lock()
 
 
@@ -41,7 +41,7 @@ def done_keys():
 
 
 def main():
-    data = json.load(open("formula_settings.json"))
+    data = json.load(open("site/data/formula_settings.json"))
     queries = []
     for r in data["records"]:
         if r["model"] != "advanced" or not r["territories"]:

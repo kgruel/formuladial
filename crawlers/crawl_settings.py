@@ -13,7 +13,7 @@ import json, os, threading
 from concurrent.futures import ThreadPoolExecutor
 from api import get, EmptyResponse
 
-OUT = "settings.jsonl"
+OUT = "data/raw/settings.jsonl"
 lock = threading.Lock()
 
 # (brand, type, stage) -> set of territories already known to be covered
@@ -23,7 +23,7 @@ covered = {}
 def load_queries():
     """Every (territory, brand, type, stage) the finder can be asked about."""
     queries = []
-    with open("stages.jsonl") as f:
+    with open("data/raw/stages.jsonl") as f:
         for line in f:
             r = json.loads(line)
             # The UI falls back to a single empty stage when the list is empty.

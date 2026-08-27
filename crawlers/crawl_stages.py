@@ -1,17 +1,17 @@
 """Layer 3 of the crawl: stage lists for every (territory, brand, type) triple.
 
-Resumable via stages.jsonl.
+Resumable via data/raw/stages.jsonl.
 """
 import json, os, threading
 from concurrent.futures import ThreadPoolExecutor
 from api import get
 
-OUT = "stages.jsonl"
+OUT = "data/raw/stages.jsonl"
 lock = threading.Lock()
 
 def load_triples():
     triples = []
-    with open("types.jsonl") as f:
+    with open("data/raw/types.jsonl") as f:
         for line in f:
             r = json.loads(line)
             for t in r["types"]:

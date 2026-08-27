@@ -1,6 +1,6 @@
 """Layer 2 of the crawl: types for every (territory, brand) pair.
 
-Resumable: every completed pair is appended to types.jsonl and skipped on
+Resumable: every completed pair is appended to data/raw/types.jsonl and skipped on
 restart.  Type lists are territory-dependent (verified empirically), so this
 layer cannot be collapsed.
 """
@@ -8,7 +8,7 @@ import json, os, sys, threading
 from concurrent.futures import ThreadPoolExecutor
 from api import get
 
-OUT = "types.jsonl"
+OUT = "data/raw/types.jsonl"
 lock = threading.Lock()
 
 def done_keys():
@@ -25,7 +25,7 @@ def done_keys():
     return keys
 
 def main():
-    bbt = json.load(open("brands_by_territory.json"))
+    bbt = json.load(open("data/brands_by_territory.json"))
     pairs = [(t, b) for t, bs in bbt.items() for b in bs]
     have = done_keys()
     todo = [p for p in pairs if p not in have]

@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from email.utils import parsedate_to_datetime
 from api import IMAGE_BASE, HEADERS
 
-OUT = "image_dates.jsonl"
+OUT = "data/raw/image_dates.jsonl"
 lock = threading.Lock()
 
 
@@ -32,7 +32,7 @@ def done():
 
 
 def main():
-    data = json.load(open("formula_settings.json"))
+    data = json.load(open("site/data/formula_settings.json"))
     imgs = sorted({r["image"] for r in data["records"] if r.get("image")})
     have = done()
     todo = [i for i in imgs if i not in have]

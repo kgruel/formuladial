@@ -15,7 +15,7 @@ Formula Pro's numbers would have drifted if anyone were still updating them.
 It is an estimate, not a correction: there is nothing to check the original's
 numbers against.
 
-    python3 crawl_legacy.py advanced   # -> legacy_advanced.jsonl
+    python3 crawlers/crawl_legacy.py advanced   # -> data/raw/legacy_advanced.jsonl
     python3 staleness.py
 """
 import json, re, sys
@@ -34,13 +34,13 @@ def setting_of(text):
 
 def main():
     live = defaultdict(set)
-    for r in json.load(open("formula_settings.json"))["records"]:
+    for r in json.load(open("site/data/formula_settings.json"))["records"]:
         if r["model"] == "advanced":
             live[(norm(r["brand"]), norm(r["type"]), norm(r["stage"]))].add(r["setting"])
 
     frozen = defaultdict(set)
     try:
-        rows = [json.loads(l) for l in open("legacy_advanced.jsonl")]
+        rows = [json.loads(l) for l in open("data/raw/legacy_advanced.jsonl")]
     except FileNotFoundError:
         sys.exit("run: python3 crawl_legacy.py advanced")
     for r in rows:
@@ -63,8 +63,8 @@ def main():
                "examples": [{"brand": k[0], "type": k[1], "stage": k[2],
                              "was": sorted(map(str, frozen[k])),
                              "now": sorted(map(str, live[k]))} for k in changed]},
-              open("staleness.json", "w"), indent=1)
-    print("\nwrote staleness.json")
+              open("data/staleness.json", "w"), indent=1)
+    print("\nwrote data/staleness.json")
 
 
 if __name__ == "__main__":

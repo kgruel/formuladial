@@ -14,7 +14,7 @@ every space-separated term must appear in "brand type stage".
 """
 import argparse, json, os, re, sys, unicodedata
 
-DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "formula_settings.json")
+DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "site/data/formula_settings.json")
 TAG = {"advanced": "ADVANCED", "pro": "PRO"}
 
 

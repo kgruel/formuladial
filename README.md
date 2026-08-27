@@ -65,7 +65,7 @@ product URL/name, so the **Mini** (`/products/formula-pro-mini`) fails both and
 never takes this branch. The lot number is on the sticker underneath the
 machine; the field is uppercased and capped at 14 characters.
 
-`crawl_alt.py` probes every Advanced record both ways. **99 of 3,867 differ**,
+`crawlers/crawl_alt.py` probes every Advanced record both ways. **99 of 3,867 differ**,
 97 of them US formulas, including most mainstream ones:
 
     Similac 360 Total Care         5 -> 6      Kirkland ProCare          5 -> 6
@@ -81,7 +81,7 @@ shows the alternate as the main number with the standard one beside it;
 
 Nothing in the API carries a timestamp, but every Advanced record points at an
 image on babybrezzacloud.com and those files answer HEAD with `Last-Modified`.
-`crawl_images.py` sweeps all 3,522.
+`crawlers/crawl_images.py` sweeps all 3,522.
 
     2023: 1601    2024: 816    2025: 720    2026: 385
     oldest 2023-01-03   newest 2026-08-25
@@ -120,16 +120,32 @@ Reconciled afterwards, zero gaps:
 
 ## Running it
 
-    python3 crawl_types.py        #  6,479 requests
-    python3 crawl_stages.py       # 41,297 requests
-    python3 crawl_settings.py     # 69,520 requests  -> settings.jsonl
-    python3 build_dataset.py      # needed before the next two
-    python3 crawl_alt.py          #  lot-11 alternates -> alt_settings.jsonl
-    python3 crawl_images.py       #  freshness dates   -> image_dates.jsonl
-    python3 build_dataset.py      # -> formula_settings.json
-    python3 build_page.py         # -> page.html
+Run everything from the repo root:
 
-Every crawler appends to a `.jsonl` and skips completed work on restart.
+    python3 crawlers/crawl_types.py     #  6,479 requests
+    python3 crawlers/crawl_stages.py    # 41,297 requests
+    python3 crawlers/crawl_settings.py  # 69,520 requests  -> data/raw/settings.jsonl
+    python3 build_dataset.py            # needed before the next two
+    python3 crawlers/crawl_alt.py       #  lot-11 alternates -> data/raw/alt_settings.jsonl
+    python3 crawlers/crawl_images.py    #  freshness dates   -> data/raw/image_dates.jsonl
+    python3 build_dataset.py            # -> site/data/formula_settings.json
+    python3 build_page.py               # -> site/index.html
+
+Every crawler appends to a `.jsonl` under `data/raw/` and skips completed work
+on restart.
+
+## Layout
+
+    crawlers/       API clients (api.py, legacy_api.py) and the crawl_*.py walks
+    data/raw/       crawl output and logs — gitignored, regenerated and resumed locally
+    data/           versioned inputs (brands_by_territory.json, the crosscheck table)
+                    and staleness.json
+    site/           what GitHub Pages serves: index.html and data/formula_settings.json
+
+`site/data/formula_settings.json` is the versioned snapshot; it carries a
+top-level `generated` date and a `counts` summary so a diff says what changed.
+The two builders read only local files — no network — so the page can be rebuilt
+from an existing crawl at any time.
 
 ## Looking things up
 
@@ -173,14 +189,14 @@ POST form-encoded, HTML fragments back. `getsetting` returns every stage in one
 table. Brands whose `gettypepro` is empty are answered by `getbrandtosetting` —
 skip that branch and you drop them silently.
 
-**Verified** against `crosscheck_loveorganicbaby.json`, a retailer table listing
+**Verified** against `data/crosscheck_loveorganicbaby.json`, a retailer table listing
 both machines: Kendamil 1/2/3 → 2/1/1 and Lebenswert → 7/9/10 on the original,
 against 4/4/4 for the same tins on the Advanced.
 
 **How stale.** That backend also holds a frozen `model_type=advanced` copy of a
 line that *is* still maintained, which makes it measurable:
 
-    $ python3 crawl_legacy.py advanced && python3 staleness.py
+    $ python3 crawlers/crawl_legacy.py advanced && python3 staleness.py
     comparable on exact name: 299
     settings changed        : 81  (27%)
 
