@@ -1,0 +1,923 @@
+{
+ "comparable": 299,
+ "changed": 81,
+ "pct": 27,
+ "examples": [
+  {
+   "brand": "abbott elecare",
+   "type": "hypoallergenic dha ara",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "aptamil",
+   "type": "advance junior",
+   "stage": "3",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "aptamil",
+   "type": "lactose free",
+   "stage": "from birth",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "aptamil nutricia",
+   "type": "profutura",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "bebelac",
+   "type": "junior",
+   "stage": "3",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "7"
+   ]
+  },
+  {
+   "brand": "bebilon nutricia",
+   "type": "prosyneo ha hydrolyzed advance dha",
+   "stage": "3",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "bebivita",
+   "type": "ha",
+   "stage": "pre",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "blemil",
+   "type": "plus ac",
+   "stage": "1",
+   "was": [
+    "8"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "blemil",
+   "type": "plus ar",
+   "stage": "1",
+   "was": [
+    "4",
+    "6"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "burt s bees baby",
+   "type": "organic infant milk",
+   "stage": "0 12 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "0"
+   ]
+  },
+  {
+   "brand": "burt s bees baby",
+   "type": "organic sensitive",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "0"
+   ]
+  },
+  {
+   "brand": "burt s bees baby",
+   "type": "organic ultra gentle",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "0"
+   ]
+  },
+  {
+   "brand": "enfamil",
+   "type": "reguline",
+   "stage": "0 12 months",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "etos",
+   "type": "dreumes melk standaard",
+   "stage": "4",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "france b b",
+   "type": "bio",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "ar baby milk",
+   "stage": "from birth",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "gold",
+   "stage": "1",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "gold",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "gold",
+   "stage": "3",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "platinum organic milk goat milk",
+   "stage": "2",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "platinum organic milk goat milk",
+   "stage": "3",
+   "was": [
+    "7"
+   ],
+   "now": [
+    "6",
+    "7"
+   ]
+  },
+  {
+   "brand": "frezy lac frezyderm",
+   "type": "silver dha",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "frisogrow",
+   "type": "comfort next",
+   "stage": "3",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "frisolac",
+   "type": "gold lactose free",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "guigoz",
+   "type": "ultima premium dha",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "hero baby",
+   "type": "nutrasense",
+   "stage": "1",
+   "was": [
+    "3"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "hipp",
+   "type": "ha combiotic",
+   "stage": "1",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "hipp",
+   "type": "junior combiotic probiotik praebiotik ro",
+   "stage": "3",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "hipp",
+   "type": "organic",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "5",
+    "6"
+   ]
+  },
+  {
+   "brand": "hipp",
+   "type": "organic",
+   "stage": "2",
+   "was": [
+    "9"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "hipp",
+   "type": "organic combiotic follow on milk",
+   "stage": "2",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5",
+    "6"
+   ]
+  },
+  {
+   "brand": "honilac",
+   "type": "goat follow on milk",
+   "stage": "2",
+   "was": [
+    "3"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "kendamil",
+   "type": "bio nature",
+   "stage": "1",
+   "was": [
+    "3"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "kruidvat",
+   "type": "geit dha",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "kruidvat",
+   "type": "opvolgmelk dha pro complex",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "l miel",
+   "type": "b b s gourmets et gourmands",
+   "stage": "1",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "l miel",
+   "type": "b b s gourmets et gourmands",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "mama bear",
+   "type": "complete comfort 2 fl hmo",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "mama bear",
+   "type": "sensitivity 2 fl hmo",
+   "stage": "0 12 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "modilac",
+   "type": "douc a lf dha",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "nestl",
+   "type": "fullkornsv lling mild",
+   "stage": "8 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "7"
+   ]
+  },
+  {
+   "brand": "nestl",
+   "type": "little steps",
+   "stage": "pre",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl beba",
+   "type": "optipro dha",
+   "stage": "pre",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "ar",
+   "stage": "from birth",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "comfortis",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "comfortis",
+   "stage": "3",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "comfortis",
+   "stage": "4",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "evolia",
+   "stage": "1",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "expert pro ha",
+   "stage": "from birth",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "3",
+    "4"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "optipro",
+   "stage": "1",
+   "was": [
+    "4",
+    "5"
+   ],
+   "now": [
+    "2",
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "optipro",
+   "stage": "2",
+   "was": [
+    "4",
+    "5"
+   ],
+   "now": [
+    "3",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "optipro",
+   "stage": "3",
+   "was": [
+    "5",
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "pro",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "pro",
+   "stage": "2",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "pro",
+   "stage": "3",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "supreme pro",
+   "stage": "1",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "nestl nan",
+   "type": "supreme pro",
+   "stage": "2",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "ad",
+   "stage": "0 36 months",
+   "was": [
+    "7"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "allernova ar",
+   "stage": "0 36 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5",
+    "6"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "ar",
+   "stage": "0 6 months",
+   "was": [
+    "5",
+    "6"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "ar",
+   "stage": "2",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "ar digest",
+   "stage": "1",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "4",
+    "6"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "ar digest",
+   "stage": "from birth",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "expert allernova ar complexe pax",
+   "stage": "0 36 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "it",
+   "stage": "3",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "novalac",
+   "type": "novarice",
+   "stage": "0 36 months",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nutramigen",
+   "type": "lgg",
+   "stage": "1",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "nutramigen",
+   "type": "lgg",
+   "stage": "3",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "3",
+    "4"
+   ]
+  },
+  {
+   "brand": "nutrilon nutricia",
+   "type": "nenatal 1",
+   "stage": "1",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "nutrilon nutricia",
+   "type": "pronutra advance",
+   "stage": "2",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "semper",
+   "type": "allomin",
+   "stage": "1",
+   "was": [
+    "3"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "serenity",
+   "type": "a2 grass fed whole milk toddler formula",
+   "stage": "12 36 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "similac",
+   "type": "advance lamehadrin infant formula",
+   "stage": "0 12 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "4"
+   ]
+  },
+  {
+   "brand": "similac",
+   "type": "advance optigro",
+   "stage": "0 12 months",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "similac",
+   "type": "alimentum",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "similac",
+   "type": "neosure",
+   "stage": "0 12 months",
+   "was": [
+    "5"
+   ],
+   "now": [
+    "6"
+   ]
+  },
+  {
+   "brand": "similac",
+   "type": "sensitive",
+   "stage": "1",
+   "was": [
+    "3"
+   ],
+   "now": [
+    "3",
+    "4"
+   ]
+  },
+  {
+   "brand": "sma",
+   "type": "alfamino",
+   "stage": "from birth",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "4",
+    "5"
+   ]
+  },
+  {
+   "brand": "sma",
+   "type": "comfort",
+   "stage": "from birth",
+   "was": [
+    "4"
+   ],
+   "now": [
+    "5"
+   ]
+  },
+  {
+   "brand": "topfer",
+   "type": "lactana bio dha",
+   "stage": "pre",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "7"
+   ]
+  },
+  {
+   "brand": "up up",
+   "type": "added rice",
+   "stage": "0 12 months",
+   "was": [
+    "6"
+   ],
+   "now": [
+    "5"
+   ]
+  }
+ ]
+}
