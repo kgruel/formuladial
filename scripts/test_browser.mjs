@@ -90,6 +90,11 @@ async function main() {
   }
 
   await setValue("q", "5099864016222", "input");
+  await evaluate("q.focus()");
+  assert.equal(await evaluate("getComputedStyle(q).outlineStyle"), "none",
+    "The formula input must not draw a second focus ring inside its control");
+  assert.notEqual(await evaluate("getComputedStyle(q.closest('.field')).boxShadow"), "none",
+    "The formula control shell must carry the focus highlight");
   assert.match(await evaluate("empty.textContent"), /Start by choosing your machine/);
   assert.equal(await evaluate("document.getElementById('machine-step').classList.contains('needs')"), true);
   assert.equal(await evaluate("out.querySelectorAll('.dialsvg').length"), 0);
@@ -104,6 +109,11 @@ async function main() {
     "Anywhere must never reveal an actionable dial");
 
   await setValue("terr", "Bahrain");
+  await evaluate("terr.focus()");
+  assert.equal(await evaluate("getComputedStyle(terr).outlineStyle"), "none",
+    "The market input must not draw a second focus ring inside its control");
+  assert.notEqual(await evaluate("getComputedStyle(terr.closest('.terr')).boxShadow"), "none",
+    "The market control shell must carry the focus highlight");
   assert.match(await evaluate("count.textContent"), /Exact formula match/);
   assert.equal(await evaluate("out.querySelector('.dialsvg text').textContent"), "4");
   assert.equal(await evaluate("out.querySelector('.rec.result') !== null"), true);

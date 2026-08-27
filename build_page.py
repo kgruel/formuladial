@@ -262,7 +262,10 @@ footer a{color:var(--ink-2)}
   background:var(--surface); border:1px solid var(--line-2);
   border-radius:9px; padding:0 12px;
 }
-.field:focus-within{border-color:var(--focus); box-shadow:0 0 0 3px var(--accent-soft)}
+.field:focus-within,.terr:focus-within{
+  border-color:var(--focus); box-shadow:0 0 0 3px var(--accent-soft);
+}
+.field input:focus-visible,.terr input:focus-visible{outline:none}
 .field svg{flex:none; width:17px; height:17px; color:var(--ink-3)}
 input,select{
   font:inherit; color:var(--ink); background:transparent; border:0; outline:0;
