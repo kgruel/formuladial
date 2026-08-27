@@ -1,0 +1,203 @@
+name: full-crawl
+
+# The whole walk: 69,520 settings queries plus the type/stage layers, the
+# lot-11 alternates and the image-date sweep. About 10 hours at the crawlers'
+# pacing, against a 6-hour job limit -- so one run is one *attempt*:
+#
+#   restore data/raw/  ->  crawl until ~4.5h  ->  save data/raw/
+#     -> not finished?  re-dispatch this workflow, one attempt later
+#     -> finished?      build, commit only site/, deploy Pages
+#
+# The crawlers resume from their .jsonl files, so an attempt that runs out of
+# clock costs nothing but the wait; scripts/remaining.py answers "is this layer
+# done" from the crawlers' own resume logic rather than from log text.
+#
+# The legacy (original Formula Pro) backend is frozen and is deliberately not
+# crawled here -- it was walked once and kept as a historical record.
+
+on:
+  schedule:
+    - cron: "41 3 1 * *"          # the 1st of each month, 03:41 UTC
+  workflow_dispatch:
+    inputs:
+      iteration:
+        description: "Attempt number; the workflow increments this when it re-dispatches itself"
+        required: false
+        default: "1"
+      reason:
+        description: "Why this crawl was started"
+        required: false
+        default: "manual"
+
+permissions:
+  contents: write                 # commit the rebuilt snapshot + page
+  actions: write                  # re-dispatch this workflow for the next attempt
+  pages: write                    # deploy
+  id-token: write                 # OIDC for deploy-pages
+
+concurrency:
+  group: full-crawl               # attempts are sequential by construction;
+  cancel-in-progress: false       # never let two of them fight over the cache
+
+env:
+  MAX_ITERATIONS: "6"             # 6 x ~4.5h comfortably covers a ~10h walk
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330          # the crawl step stops itself at 280
+    outputs:
+      status: ${{ steps.crawl.outputs.status }}
+      committed: ${{ steps.commit.outputs.committed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Start of a cycle -- refresh the crawl's root input
+        # crawl_types.py walks data/brands_by_territory.json, so a stale copy
+        # would make the whole loop unable to converge: the tripwire spots a new
+        # brand, the crawl walks the old list, the snapshot comes back the same,
+        # and the tripwire reports it again next week. ~80 requests.
+        if: (inputs.iteration || '1') == '1'
+        run: python3 scripts/refresh_brands.py
+
+      - name: Resume an unfinished crawl
+        # Deliberately skipped on attempt 1: restore-keys would otherwise hand a
+        # fresh monthly run the *finished* cache from last month, every layer
+        # would report nothing to do, and the crawl would silently republish
+        # stale data forever. The cache resumes a cycle; it never starts one.
+        if: (inputs.iteration || '1') != '1'
+        # actions/cache only *saves* on a key miss, so a fixed key would never
+        # carry progress forward. Save under a per-run key, restore the newest
+        # match of the prefix.
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: |
+            raw-
+
+      - name: Crawl until done or out of clock
+        id: crawl
+        env:
+          DEADLINE_MIN: "280"
+        run: bash .github/scripts/crawl-until-deadline.sh
+
+      - name: Save crawl progress
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+
+      - name: Report progress
+        if: always()
+        run: |
+          {
+            echo "### full-crawl attempt ${{ inputs.iteration || '1' }}"
+            echo "status: \`${{ steps.crawl.outputs.status }}\`"
+            echo '```'
+            python3 scripts/remaining.py all || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Queue the next attempt
+        if: steps.crawl.outputs.status == 'incomplete'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ITERATION: ${{ inputs.iteration || '1' }}
+        run: |
+          next=$(( ITERATION + 1 ))
+          if [ "$next" -gt "$MAX_ITERATIONS" ]; then
+            echo "::error::crawl still unfinished after $ITERATION attempts; stopping"
+            python3 scripts/remaining.py all || true
+            exit 1
+          fi
+          # workflow_dispatch is one of the two events GITHUB_TOKEN may raise
+          # (with repository_dispatch); the recursion guard does not cover it.
+          gh workflow run full-crawl.yml \
+            -f iteration="$next" \
+            -f reason="resuming attempt $next of ${{ inputs.reason || 'scheduled crawl' }}"
+          echo "dispatched attempt $next"
+
+      - name: Build the dataset, the page and the watch baseline
+        if: steps.crawl.outputs.status == 'complete'
+        run: |
+          python3 build_dataset.py
+          python3 build_page.py
+          python3 scripts/watch.py --write-baseline
+          python3 staleness.py > /dev/null 2>&1 || true
+          # data/raw/ is untracked, so a CI checkout starts with no crawl output
+          # at all; every loader in build_dataset.py treats a missing input as
+          # "no rows" rather than an error. Refuse to publish a snapshot that
+          # lost a whole model to that.
+          python3 - <<'PY'
+          import json, sys
+          c = json.load(open("site/data/formula_settings.json"))["counts"]
+          bad = [k for k in ("advanced", "pro") if c.get(k, 0) < 1000]
+          if bad:
+              sys.exit("refusing to publish: %s collapsed (%s)" % (", ".join(bad), c))
+          print("sanity ok:", c)
+          PY
+
+      - name: Commit the snapshot if it moved
+        id: commit
+        if: steps.crawl.outputs.status == 'complete'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only site/ and the tripwire baseline; data/raw/ stays untracked.
+          git add -- site data/watch_baseline.json \
+                     data/brands_by_territory.json data/staleness.json
+          if git diff --cached --quiet; then
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            echo "snapshot unchanged; nothing to commit"
+            exit 0
+          fi
+          python3 - <<'PY' > msg.txt
+          import json, subprocess
+          d = json.load(open("site/data/formula_settings.json"))
+          c = d["counts"]
+          old = subprocess.run(
+              ["git", "show", "HEAD:site/data/formula_settings.json"],
+              capture_output=True, text=True)
+          print("Refresh snapshot (%s)" % d["generated"])
+          print()
+          if old.returncode == 0:
+              o = json.loads(old.stdout).get("counts", {})
+              deltas = ["%s %s -> %s" % (k, o.get(k, "?"), v)
+                        for k, v in c.items() if o.get(k) != v]
+              print("\n".join("  " + x for x in deltas) if deltas
+                    else "  counts unchanged; record contents differ")
+              print()
+          print("  ".join("%s=%s" % kv for kv in c.items()))
+          PY
+          cat msg.txt
+          git commit -F msg.txt
+          git pull --rebase --autostash
+          git push
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+          cat msg.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the site for Pages
+        if: steps.crawl.outputs.status == 'complete'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: crawl
+    if: needs.crawl.outputs.status == 'complete'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

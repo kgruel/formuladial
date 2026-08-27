@@ -15,7 +15,7 @@ Formula Pro's numbers would have drifted if anyone were still updating them.
 It is an estimate, not a correction: there is nothing to check the original's
 numbers against.
 
-    python3 crawlers/crawl_legacy.py advanced   # -> data/raw/legacy_advanced.jsonl
+    python3 crawlers/crawl_legacy.py advanced   # -> data/legacy/legacy_advanced.jsonl
     python3 staleness.py
 """
 import json, re, sys
@@ -40,7 +40,7 @@ def main():
 
     frozen = defaultdict(set)
     try:
-        rows = [json.loads(l) for l in open("data/raw/legacy_advanced.jsonl")]
+        rows = [json.loads(l) for l in open("data/legacy/legacy_advanced.jsonl")]
     except FileNotFoundError:
         sys.exit("run: python3 crawl_legacy.py advanced")
     for r in rows:

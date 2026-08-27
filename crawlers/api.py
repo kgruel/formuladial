@@ -60,3 +60,24 @@ def get(path, retries=4, **params):
             # 200 with an empty/plain body means "no such combination".
             raise EmptyResponse(url)
     raise last
+
+
+def head(url, retries=3):
+    """HEAD a URL with the same browser headers, returning the response headers.
+
+    Used for the image `Last-Modified` sweep (crawl_images.py) and the weekly
+    tripwire (scripts/watch.py) -- one place that knows how to talk to the
+    origin, so neither has to hand-roll a urllib request.
+    """
+    last = None
+    for i in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS, method="HEAD")
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return dict(r.headers)
+        except urllib.error.HTTPError as e:
+            raise                                   # 404/403 are answers, not flakes
+        except Exception as e:
+            last = e
+            time.sleep(1.5 * (i + 1))
+    raise last

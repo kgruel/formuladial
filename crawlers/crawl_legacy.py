@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from legacy_api import post, options, rows
 
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "pro"
-OUT = f"data/raw/legacy_{MODEL}.jsonl"
+OUT = f"data/legacy/legacy_{MODEL}.jsonl"
 lock = threading.Lock()
 # An old index.php backend and the only copy of this data -- stay gentle.
 CONCURRENCY = 4

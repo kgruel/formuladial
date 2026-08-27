@@ -85,16 +85,63 @@ reconciles to zero gaps — is covered in
 ## Layout
 
     crawlers/       API clients (api.py, legacy_api.py) and the crawl_*.py walks
+    scripts/        automation: watch.py (the tripwire), remaining.py, refresh_brands.py
     data/raw/       crawl output and logs — gitignored, regenerated and resumed locally
-    data/           versioned inputs (brands_by_territory.json, the crosscheck table)
-                    and staleness.json
+    data/           versioned inputs (brands_by_territory.json, the crosscheck table),
+                    watch_baseline.json and staleness.json
+    data/legacy/    the original Formula Pro crawl — versioned, because that backend
+                    is frozen and will never be crawled again
     docs/           HOW-IT-WORKS.md — the reverse-engineering notes
     site/           what GitHub Pages serves: index.html and data/formula_settings.json
+    .github/        the weekly watch and the monthly full crawl
 
 `site/data/formula_settings.json` is the versioned snapshot; it carries a
 top-level `generated` date and a `counts` summary so a diff says what changed.
 The two builders read only local files — no network — so the page can be rebuilt
 from an existing crawl at any time.
+
+## Keeping it fresh
+
+Baby Brezza edits this data — 385 of the images were re-uploaded in 2026 alone —
+so the snapshot needs re-crawling, and a 69,520-request walk is too expensive to
+run on a hunch. Two workflows, a cheap one and an expensive one:
+
+**`scripts/watch.py`**, weekly (`.github/workflows/watch.yml`). About 10,000
+requests, an hour and a half. It re-walks the catalogue's shape
+(territories → brands → types), HEADs every image the snapshot references for
+its `Last-Modified` and upload id, and re-queries ~30 popular formulas across
+the US, Germany, France, the UK and Canada — the lot-11 alternates included,
+since those are the numbers known to move. It prints a JSON verdict and exits 0
+for *unchanged*, 1 for *changed*. On a change it opens (or comments on) an issue
+with the delta and dispatches the full crawl.
+
+Two things it deliberately does not do. It does not diff live type lists against
+the snapshot: 194 live (territory, brand, type) combinations legitimately answer
+with no setting, so that comparison would cry wolf every week. It diffs against
+`data/watch_baseline.json` instead, which the full crawl rewrites each time.
+And it does not hardcode the settings it expects — only the queries. The
+expected values are read from the committed snapshot at run time, so a real
+refresh re-arms the tripwire by itself.
+
+**The full crawl**, monthly or on demand (`.github/workflows/full-crawl.yml`).
+The walk takes about ten hours; a GitHub Actions job may live six. Since every
+crawler already resumes from its `.jsonl`, a run is one *attempt*: restore
+`data/raw/` from the cache, crawl until a 4h40m deadline, save it back, and if
+`scripts/remaining.py` still reports work left, dispatch the workflow again one
+attempt further along (capped at six). When it finishes, it rebuilds the
+dataset, the page and the baseline, commits whatever moved under `site/` with
+the count delta in the commit message, and deploys Pages.
+
+The cache resumes a cycle; it never starts one. A fresh run skips the restore
+entirely — otherwise next month's crawl would inherit last month's *finished*
+cache, find nothing to do, and republish stale data forever.
+
+The original Formula Pro's backend is frozen. It was crawled once and lives in
+`data/legacy/`, versioned rather than regenerated, and nothing schedules it.
+
+    python3 scripts/watch.py              # the tripwire; 0 unchanged, 1 changed
+    python3 scripts/test_watch.py         # its diff logic, offline
+    python3 scripts/remaining.py all      # what a resumed crawl still owes
 
 ---
 

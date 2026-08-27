@@ -3,7 +3,7 @@
 Two machines, two backends, two datasets:
 
   advanced  data/raw/settings.jsonl     -- the current API (crawlers/api.py), Formula Pro Advanced
-  pro       data/raw/legacy_pro.jsonl   -- the retired backend (crawlers/legacy_api.py), original
+  pro       data/legacy/legacy_pro.jsonl   -- the retired backend (crawlers/legacy_api.py), original
                                   Formula Pro (FRP0045)
 
 The current API filters each record's `territory` array down to the territory
@@ -59,7 +59,7 @@ def load_advanced(path="data/raw/settings.jsonl"):
     return rows, dict(stats)
 
 
-def load_pro(path="data/raw/legacy_pro.jsonl"):
+def load_pro(path="data/legacy/legacy_pro.jsonl"):
     rows, stats = [], defaultdict(int)
     if not os.path.exists(path):
         return rows, dict(stats)

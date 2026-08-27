@@ -1,0 +1,103 @@
+name: watch
+
+# The cheap weekly tripwire (~10k requests, ~1.5h): has Baby Brezza's catalogue
+# moved since the snapshot in site/data/? If it has, say what changed in an
+# issue and hand off to the full crawl. See scripts/watch.py.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"          # Mondays, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read                  # read the committed snapshot + baseline
+  issues: write                   # open/update the "upstream changed" issue
+  actions: write                  # dispatch full-crawl.yml
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Probe the live API and diff it against the snapshot
+        id: watch
+        run: |
+          set +e
+          python3 scripts/watch.py --out watch.json
+          code=$?
+          set -e
+          case "$code" in
+            0) verdict=unchanged ;;
+            1) verdict=changed ;;
+            *) verdict=error ;;
+          esac
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "### watch: $verdict" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f watch.json ]; then
+            python3 -c "import json;print(json.load(open('watch.json'))['summary'])" \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+          [ "$verdict" = "error" ] && exit 1
+          exit 0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: watch-report
+          path: watch.json
+          if-no-files-found: warn
+
+      - name: Open or update the tracking issue
+        if: steps.watch.outputs.verdict == 'changed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY' > body.md
+          import json, os
+          r = json.load(open("watch.json"))
+          run = "%s/%s/actions/runs/%s" % (os.environ["GITHUB_SERVER_URL"],
+                                           os.environ["GITHUB_REPOSITORY"],
+                                           os.environ["GITHUB_RUN_ID"])
+          print("Upstream has moved since the committed snapshot"
+                " (`%s`, baseline `%s`).\n" % (r["snapshot_generated"],
+                                               r["baseline_generated"]))
+          print(r["summary"])
+          print("\nChecked %s with %d requests. [Watch run](%s)."
+                % (r["checked_at"], r["requests"], run))
+          print("\nA full crawl has been dispatched; it commits the new snapshot"
+                " to `site/` when it finishes.")
+          PY
+          existing=$(gh issue list --label upstream-drift --state open \
+                       --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+            echo "commented on #$existing"
+          else
+            gh label create upstream-drift --color FBCA04 \
+              --description "Baby Brezza's API no longer matches the snapshot" \
+              2>/dev/null || true
+            gh issue create --title "Upstream data drift detected" \
+              --label upstream-drift --body-file body.md
+          fi
+
+      - name: Dispatch the full crawl
+        if: steps.watch.outputs.verdict == 'changed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # workflow_dispatch is one of the two events GITHUB_TOKEN is allowed
+          # to raise (the other is repository_dispatch); the usual "a token's
+          # events don't start workflows" recursion guard does not apply.
+          gh workflow run full-crawl.yml \
+            -f iteration=1 \
+            -f reason="watch run ${GITHUB_RUN_ID} saw upstream drift"
