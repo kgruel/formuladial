@@ -6,12 +6,13 @@ layer cannot be collapsed.
 """
 import json, os, sys, threading
 from concurrent.futures import ThreadPoolExecutor
-from api import get
+from api import EmptyResponse, get
 
 OUT = "data/raw/types.jsonl"
 lock = threading.Lock()
 
 def done_keys():
+    """Pairs with a verified response (including an explicit no-match)."""
     if not os.path.exists(OUT):
         return set()
     keys = set()
@@ -21,7 +22,18 @@ def done_keys():
                 r = json.loads(line)
             except ValueError:
                 continue
-            keys.add((r["territory"], r["brand"]))
+            if not isinstance(r, dict):
+                continue
+            # Error rows are retained as an audit trail, but must be retried.
+            # This also makes rows written by older crawler versions retryable.
+            if r.get("error"):
+                continue
+            if not isinstance(r.get("types"), list):
+                continue
+            try:
+                keys.add((r["territory"], r["brand"]))
+            except KeyError:
+                continue
     return keys
 
 def main():
@@ -37,9 +49,14 @@ def main():
         try:
             types = get("types", territory=t, brand=b)
             err = None
+            no_match = False
+        except EmptyResponse:
+            types, err, no_match = [], None, True
         except Exception as e:
-            types, err = [], str(e)
+            types, err, no_match = [], str(e), False
         rec = {"territory": t, "brand": b, "types": types}
+        if no_match:
+            rec["no_match"] = True
         if err:
             rec["error"] = err
         with lock:

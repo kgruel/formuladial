@@ -1,7 +1,8 @@
 {
- "comparable": 299,
- "changed": 81,
- "pct": 27,
+ "comparable": 276,
+ "ambiguous_excluded": 23,
+ "changed": 59,
+ "pct": 21,
  "examples": [
   {
    "brand": "abbott elecare",
@@ -92,18 +93,6 @@
    ]
   },
   {
-   "brand": "blemil",
-   "type": "plus ar",
-   "stage": "1",
-   "was": [
-    "4",
-    "6"
-   ],
-   "now": [
-    "4"
-   ]
-  },
-  {
    "brand": "burt s bees baby",
    "type": "organic infant milk",
    "stage": "0 12 months",
@@ -148,18 +137,6 @@
    ]
   },
   {
-   "brand": "etos",
-   "type": "dreumes melk standaard",
-   "stage": "4",
-   "was": [
-    "5"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
    "brand": "france b b",
    "type": "bio",
    "stage": "2",
@@ -184,18 +161,6 @@
   {
    "brand": "frezy lac frezyderm",
    "type": "gold",
-   "stage": "1",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "frezy lac frezyderm",
-   "type": "gold",
    "stage": "2",
    "was": [
     "5"
@@ -224,18 +189,6 @@
    ],
    "now": [
     "5"
-   ]
-  },
-  {
-   "brand": "frezy lac frezyderm",
-   "type": "platinum organic milk goat milk",
-   "stage": "3",
-   "was": [
-    "7"
-   ],
-   "now": [
-    "6",
-    "7"
    ]
   },
   {
@@ -318,36 +271,12 @@
   {
    "brand": "hipp",
    "type": "organic",
-   "stage": "1",
-   "was": [
-    "5"
-   ],
-   "now": [
-    "5",
-    "6"
-   ]
-  },
-  {
-   "brand": "hipp",
-   "type": "organic",
    "stage": "2",
    "was": [
     "9"
    ],
    "now": [
     "4"
-   ]
-  },
-  {
-   "brand": "hipp",
-   "type": "organic combiotic follow on milk",
-   "stage": "2",
-   "was": [
-    "6"
-   ],
-   "now": [
-    "5",
-    "6"
    ]
   },
   {
@@ -538,117 +467,6 @@
    ]
   },
   {
-   "brand": "nestl nan",
-   "type": "expert pro ha",
-   "stage": "from birth",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "3",
-    "4"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "optipro",
-   "stage": "1",
-   "was": [
-    "4",
-    "5"
-   ],
-   "now": [
-    "2",
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "optipro",
-   "stage": "2",
-   "was": [
-    "4",
-    "5"
-   ],
-   "now": [
-    "3",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "optipro",
-   "stage": "3",
-   "was": [
-    "5",
-    "6"
-   ],
-   "now": [
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "pro",
-   "stage": "1",
-   "was": [
-    "5"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "pro",
-   "stage": "2",
-   "was": [
-    "5"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "pro",
-   "stage": "3",
-   "was": [
-    "5"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "supreme pro",
-   "stage": "1",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
-   "brand": "nestl nan",
-   "type": "supreme pro",
-   "stage": "2",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "4",
-    "5"
-   ]
-  },
-  {
    "brand": "novalac",
    "type": "ad",
    "stage": "0 36 months",
@@ -661,30 +479,6 @@
   },
   {
    "brand": "novalac",
-   "type": "allernova ar",
-   "stage": "0 36 months",
-   "was": [
-    "6"
-   ],
-   "now": [
-    "5",
-    "6"
-   ]
-  },
-  {
-   "brand": "novalac",
-   "type": "ar",
-   "stage": "0 6 months",
-   "was": [
-    "5",
-    "6"
-   ],
-   "now": [
-    "6"
-   ]
-  },
-  {
-   "brand": "novalac",
    "type": "ar",
    "stage": "2",
    "was": [
@@ -692,18 +486,6 @@
    ],
    "now": [
     "5"
-   ]
-  },
-  {
-   "brand": "novalac",
-   "type": "ar digest",
-   "stage": "1",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "4",
-    "6"
    ]
   },
   {
@@ -762,18 +544,6 @@
    ]
   },
   {
-   "brand": "nutramigen",
-   "type": "lgg",
-   "stage": "3",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "3",
-    "4"
-   ]
-  },
-  {
    "brand": "nutrilon nutricia",
    "type": "nenatal 1",
    "stage": "1",
@@ -781,18 +551,6 @@
     "6"
    ],
    "now": [
-    "5"
-   ]
-  },
-  {
-   "brand": "nutrilon nutricia",
-   "type": "pronutra advance",
-   "stage": "2",
-   "was": [
-    "4"
-   ],
-   "now": [
-    "4",
     "5"
    ]
   },
@@ -860,30 +618,6 @@
    ],
    "now": [
     "6"
-   ]
-  },
-  {
-   "brand": "similac",
-   "type": "sensitive",
-   "stage": "1",
-   "was": [
-    "3"
-   ],
-   "now": [
-    "3",
-    "4"
-   ]
-  },
-  {
-   "brand": "sma",
-   "type": "alfamino",
-   "stage": "from birth",
-   "was": [
-    "6"
-   ],
-   "now": [
-    "4",
-    "5"
    ]
   },
   {

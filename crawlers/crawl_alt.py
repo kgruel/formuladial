@@ -28,26 +28,36 @@ lock = threading.Lock()
 
 
 def done_keys():
+    """Queries for which both default and lot-11 requests were answered."""
     if not os.path.exists(OUT):
         return set()
     keys = set()
     with open(OUT) as f:
         for line in f:
             try:
-                keys.add(tuple(json.loads(line)["query"]))
-            except ValueError:
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    continue
+                # New rows carry a structured error map.  Older rows encoded
+                # failures as "ERR ..." in either value; treat both forms as
+                # incomplete so they are retried.
+                if row.get("error") or row.get("errors"):
+                    continue
+                if any(isinstance(row.get(k), str) and row[k].startswith("ERR ")
+                       for k in ("default", "alt")):
+                    continue
+                if "default" not in row or "alt" not in row:
+                    continue
+                keys.add(tuple(row["query"]))
+            except (KeyError, TypeError, ValueError):
                 continue
     return keys
 
 
 def main():
     data = json.load(open("site/data/formula_settings.json"))
-    queries = []
-    for r in data["records"]:
-        if not r["territories"]:
-            continue
-        queries.append((r["territories"][0], r["brand"], r["type"], r["stage"]))
-    queries = sorted(set(queries))
+    queries = sorted({(r["territories"][0], r["brand"], r["type"], r["stage"])
+                      for r in data["records"]})
 
     have = done_keys()
     todo = [q for q in queries if q not in have]
@@ -59,6 +69,7 @@ def main():
     def work(q):
         terr, brand, typ, stage = q
         got = {}
+        errors = {}
         for alt in ("false", "true"):
             try:
                 rec = get("settings", territory=terr, brand=brand, type=typ,
@@ -67,8 +78,11 @@ def main():
             except EmptyResponse:
                 got[alt] = None
             except Exception as e:
-                got[alt] = f"ERR {e}"
+                got[alt] = None
+                errors[alt] = str(e)
         row = {"query": list(q), "default": got["false"], "alt": got["true"]}
+        if errors:
+            row["errors"] = errors
         with lock:
             with open(OUT, "a") as f:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")

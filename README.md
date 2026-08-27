@@ -1,9 +1,8 @@
 # Brezza Setting Finder
 
 A free, searchable page with every powder setting Baby Brezza publishes for
-their formula makers — the Formula Pro Advanced family (Advanced, Advanced
-WiFi, Mini) and the discontinued original Formula Pro. No email address, no
-lookup limit, no tracking. Type a brand, get the number.
+the Formula Pro Advanced family: Advanced, Advanced WiFi, and Mini. No email
+address, no lookup limit, no tracking. Type a brand, get the number.
 
 **Use it here: https://USER.github.io/REPO/**
 
@@ -11,7 +10,7 @@ Two things to know before you trust any number, from here or anywhere:
 
 * **Check the number against your own tin before mixing a bottle.** This is
   infant food prep. Manufacturers reformulate, and the setting for the same
-  brand name can differ by stage, country, and even your machine's lot number.
+  brand name can differ by stage, market, and even your machine's lot number.
   If what the tin says and what the finder says disagree, believe neither —
   ask Baby Brezza.
 * **"Dated" means "not touched since", never "verified on".** The dates shown
@@ -41,24 +40,27 @@ what is and isn't consent-gated — are in
 
 ## What's in it
 
-* **3,867 Formula Pro Advanced settings** across 78 countries, searchable by
+* **3,867 Formula Pro Advanced settings** across 78 markets/territories, searchable by
   brand, formula name, or barcode — typed or scanned with your phone's camera,
-  decoded on-device.
+  decoded on-device. Machine, market, and exact-tin steps stay visibly separate
+  so a dial number only appears after all three are resolved.
+* **Searchable markets and inspectable tins.** The market field filters as you
+  type, popular-brand shortcuts remain one click away, and locally served
+  product images enlarge on hover, keyboard focus, click, or tap.
 * **Evidence when a number has moved.** Baby Brezza revises settings with no
   change log or notice. Compared against a frozen ~2022 copy of their own data,
-  81 of 299 comparable settings had changed — those results carry a struck-out
+  59 of 276 unambiguous settings had changed — those results carry a struck-out
   "was" chip on the page.
 * **Lot-11 alternates.** Advanced and Advanced WiFi machines whose lot number
   (sticker underneath) starts with 11 use different numbers for 99 formulas —
   including Similac 360, Enfamil NeuroPro Gentlease, and Kirkland ProCare.
   Enter your lot number and the page shows the right one. The Mini never uses
   these.
-* **The discontinued original Formula Pro**, which Baby Brezza's finder no
-  longer offers at all. Its numbers come from a retired backend and have
-  drifted an estimated ~27% since it froze — treat them as a starting point,
-  not gospel. It ships as its own file, `site/data/legacy_formula_pro.json`,
-  kept out of the live snapshot so that frozen data never inherits a fresh
-  date. Details in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
+
+The discontinued original Formula Pro is intentionally not part of the app.
+Its frozen raw data remains under `data/legacy/` as a historical research
+artifact; it is not deployed, searched, or presented as usable current data.
+Details are in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
 
 ## Command-line lookup
 
@@ -68,7 +70,16 @@ If you have the repo checked out:
     ./lookup.py similac 360 --lot 1123ABC      # numbers for a lot-11 Advanced
     ./lookup.py --upc 070074680644             # barcode (Advanced only)
     ./lookup.py --alt-only enfamil             # only formulas with an alternate
-    ./lookup.py kendamil -m pro                # the discontinued original
+
+The command-line lookup has the same confidence boundary as the page. A single
+market-specific match is `unique`; a missing `--territory`, several text
+matches, or a barcode mapping to different tins is `ambiguous`, and settings
+are withheld until the lookup is narrowed. A formula that Baby Brezza knows about
+but for which it publishes no usable setting is `known_unavailable`; no match
+at all is `not_found`. With `--json`, non-unique and unavailable outcomes use
+an envelope with `state`, `results`, and `unavailable` fields. The original
+Formula Pro is never a CLI lookup mode: its values remain only in the raw
+archive under `data/legacy/`.
 
 ## Rebuilding the dataset
 
@@ -81,12 +92,13 @@ Run from the repo root:
     python3 build_dataset.py            # needed before the next two
     python3 crawlers/crawl_alt.py       #  lot-11 alternates -> data/raw/alt_settings.jsonl
     python3 crawlers/crawl_images.py    #  freshness dates   -> data/raw/image_dates.jsonl
-    python3 build_dataset.py            # -> both files under site/data/
+    python3 scripts/record_observation.py # bind the source-observation date to this crawl
+    python3 build_dataset.py            # -> site/data/formula_settings.json
     python3 build_page.py               # -> site/index.html
 
-Every crawler appends to a `.jsonl` under `data/raw/` and skips completed work
-on restart. Why the crawl has to be an exhaustive four-level walk — and how it
-reconciles to zero gaps — is covered in
+Every crawler appends to a `.jsonl` under `data/raw/` and skips successfully
+completed work on restart; failed requests remain retryable. Why the crawl has
+to be an exhaustive four-level walk — and how it reconciles to zero gaps — is covered in
 [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
 
 ## Layout
@@ -95,22 +107,27 @@ reconciles to zero gaps — is covered in
     scripts/        automation: watch.py (the tripwire), remaining.py, refresh_brands.py
     data/raw/       crawl output and logs — gitignored, regenerated and resumed locally
     data/           versioned inputs (brands_by_territory.json, the crosscheck table),
-                    watch_baseline.json and staleness.json
-    data/legacy/    the original Formula Pro crawl — versioned, because that backend
-                    is frozen and will never be crawled again
+                    watch_baseline.json, crawl_observation.json, setting_history.json
+    data/legacy/    frozen historical crawls — archived, never deployed by the app
     docs/           HOW-IT-WORKS.md — the reverse-engineering notes
-    site/           what GitHub Pages serves: index.html, data/formula_settings.json
-                    and data/legacy_formula_pro.json
+    site/           what GitHub Pages serves: index.html, current snapshot,
+                    256px product previews, and self-hosted licensed fonts
     .github/        the weekly watch and the monthly full crawl
 
 `site/data/formula_settings.json` is the versioned snapshot of the live
-Advanced line; it carries a top-level `generated` date and a `counts` summary so
-a diff says what changed. The frozen original sits beside it in
-`site/data/legacy_formula_pro.json`, which deliberately carries no `generated`
-date — it records when it was *crawled* instead, because re-stamping frozen data
-every month would claim a freshness it does not have. The two builders read only
-local files — no network — so the page can be rebuilt from an existing crawl at
-any time.
+Advanced family; it carries separate `generated` and hash-bound `observed` dates
+and a `counts` summary so a diff says what changed without calling a rebuild a
+source check. `data/setting_history.json` begins empty and accumulates standard
+or lot-11 movements between complete future crawls. The builder reads only local files — no network —
+so the page can be rebuilt from an existing crawl at any time. Historical data
+under `data/legacy/` is outside that build and deployment path.
+
+The snapshot may also carry a top-level `unavailable` list. These are known
+catalogue products for which the current API returned no usable dial setting;
+each row records `brand`, `type`, `stage`, `territories`, `reason`, `upc`, and
+`image`. They are deliberately separate from `records`: an unavailable row
+must never be rendered as a guessed or blank number. Consumers should expose
+it as “known, but no published setting” and direct the owner to Baby Brezza.
 
 ## Keeping it fresh
 
@@ -149,7 +166,7 @@ entirely — otherwise next month's crawl would inherit last month's *finished*
 cache, find nothing to do, and republish stale data forever.
 
 The original Formula Pro's backend is frozen. It was crawled once and lives in
-`data/legacy/`, versioned rather than regenerated, and nothing schedules it.
+`data/legacy/` as an archive; nothing schedules, publishes, or serves it.
 
     python3 scripts/watch.py              # the tripwire; 0 unchanged, 1 changed
     python3 scripts/test_watch.py         # its diff logic, offline

@@ -18,8 +18,9 @@ like:
      "territory": ["United States of America"], "upc": ["300875126400"],
      "image": ["5a33fc11-....jpg"]}
 
-The `territory` array lists *every* territory the record belongs to, which is
-what makes the crawl's de-duplication lossless.
+For `settings`, the `territory` array is filtered to the territory requested;
+it does not describe every market for the product. The crawler therefore walks
+every territory/type/stage combination before merging identical answers.
 """
 import json, time, urllib.error, urllib.parse, urllib.request
 

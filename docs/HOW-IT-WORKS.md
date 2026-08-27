@@ -26,6 +26,25 @@ The email itself is checked by one regex in the browser. The settings API never
 asks for it. `validateEmail()` is what gates the territory dropdown, the barcode
 scanner and the barcode submit — that is the entire lock.
 
+## Privacy contract of this app
+
+The point of the local snapshot is that a search is a local operation: the
+formula text, barcode, market, machine choice, and lot number must not be sent
+to any service. The machine and market may be remembered for convenience, but
+the current formula query is session-only (in-memory or `sessionStorage`), not
+in persistent `localStorage`; closing the tab should clear it. A future change
+to persistence needs to preserve that boundary and should never store a lot
+number or formula-search history by default. The setting-change timeline is
+public source-data history and contains no user activity.
+
+The deployed page must also be self-contained with respect to presentation
+assets. Fonts and scripts should be bundled or served from this repository,
+not fetched from Google Fonts or another third-party CDN. Otherwise a page
+with a local search can still disclose a visit, IP address, and browser
+metadata to an asset provider. The barcode decoder is already vendored and
+loaded same-origin on demand. These are release requirements, not claims that
+the upstream Baby Brezza finder shares this privacy model.
+
 ## The API
 
 Unauthenticated GETs. The Canadian site proxies them at
@@ -86,7 +105,16 @@ HiPP HA2 Combiotik 4 -> 3), twice a drop to 0. The page takes a lot number and
 shows the alternate as the main number with the standard one beside it;
 `lookup.py --lot 11X` does the same.
 
-## Dating the data
+## Dating and observing the data
+
+The settings endpoint has no timestamp, so “page generated” must never be
+presented as “source checked.” After a complete crawl,
+`scripts/record_observation.py` records the UTC observation date together with
+the SHA-256 of `settings.jsonl`; `build_dataset.py` refuses to publish the date
+unless the hash still matches. Results can therefore say “Last checked against
+Baby Brezza’s data on …” without borrowing an unrelated image date. Complete future
+crawls are compared per formula and market, and actual standard or lot-11
+movements are appended to `data/setting_history.json` for the result timeline.
 
 Nothing in the API carries a timestamp, but every Advanced record points at an
 image on babybrezzacloud.com and those files answer HEAD with `Last-Modified`.
@@ -98,7 +126,7 @@ image on babybrezzacloud.com and those files answer HEAD with `Last-Modified`.
 So the Advanced data is live and actively curated. **Caveat, and it matters:
 this dates the image, not the number.** A record whose picture was uploaded in
 2023 may have had its setting revised since without the picture changing. Read
-it as "not touched since", never "verified on". The filenames also carry what
+it as image provenance, never as the setting’s “last checked” date. The filenames also carry what
 looks like a sequential upload id (`20467-<uuid>.png`) which agrees with the
 dates about 86% of the time — useful for ordering, not for dating.
 
@@ -129,17 +157,39 @@ Reconciled afterwards, zero gaps:
 
 ## Known data quirks
 
+* **Known but unavailable is not the same as not found.** A current snapshot may
+  carry a top-level `unavailable` list alongside `records`. Each entry has
+  `brand`, `type`, `stage`, `territories`, `reason`, `upc`, and `image`; it means the
+  catalogue recognized the product but the settings endpoint did not publish a
+  usable dial value. Builders and clients must keep these rows separate from
+  numeric records and show an explicit “known, but no published setting” state.
+  A search with no matching `records` or `unavailable` entries is the distinct
+  `not_found` state.
+* **Lookup confidence has four states.** A single market-specific result is `unique`;
+  multiple candidates are `ambiguous`; a known product without a usable value
+  is `known_unavailable`; and an empty search is `not_found`. Barcode results
+  with conflicting settings must remain non-actionable until a territory is
+  selected. Text searches may display identifying candidate details, but no
+  setting, until a market and exact tin reduce the result to one.
+* **76 completed queries publish no dial record.** Forty catalogue types expose
+  no stage even though the settings endpoint requires one; they are recorded as
+  explicit no-matches. Another 36 return a structured record with
+  `setting: null`. Both are upstream answers rather than transport failures,
+  and both remain visible in the snapshot's `crawl_stats` instead of being
+  converted into a number.
 * **43 Advanced records answer with `setting: 0`.** The dial runs 1–10, so 0 is
   not a position on it. Twelve also carry the stage `NC`; the rest are mostly
   toddler drinks, amino-acid formulas and milk powders. Neither of Baby Brezza's
   own UIs special-cases it — they print "0". Shown here as *No dial position*.
   The drift comparison below makes it more interesting: Burt's Bees moved from a
   real 5 to 0, so it is a value they changed *to*, not a missing entry.
-* One genuine conflict: `Novalac Allernova AR+`, 0-36 Months, European Union
-  returns two rows — settings **8** and **5**. Reported, not silently resolved.
-* Territory names differ between the two backends ("European Union" in the old
-  set, individual countries in the new; "United States Of America" vs "…of
-  America"). The page offers only the selected model's list.
+* The historical original-Pro archive contains one genuine conflict:
+  `Novalac Allernova AR+`, 0-36 Months, European Union has rows for settings
+  **8** and **5**. This is one reason it is not exposed as current app data.
+* Territory names differ between the current data and historical archive
+  ("European Union" in the old set, individual countries in the new;
+  "United States Of America" vs "…of America"). The app uses only the current
+  API's territory list.
 * Search highlighting is skipped on names containing a character NFKD expands
   (`Reguline™`), since folding shifts every offset after it. Matching is
   unaffected.
@@ -169,22 +219,21 @@ against 4/4/4 for the same tins on the Advanced.
 line that *is* still maintained, which makes it measurable:
 
     $ python3 crawlers/crawl_legacy.py advanced && python3 staleness.py
-    comparable on exact name: 299
-    settings changed        : 81  (27%)
+    unambiguous exact-name comparisons: 276
+    settings changed                  : 59  (21%)
 
-Assuming both halves froze together, ~27% is the best estimate of how far the
+Assuming both halves froze together, ~21% is the best estimate of how far the
 original's numbers have drifted. It is an estimate, not a correction — there is
-nothing to check them against. The 81 changed settings also surface on the page
-itself: where the frozen copy disagrees with today's number, the matching
-Advanced results carry a struck-out *was N* chip. Dating it independently: the original's US set has
+nothing to check them against. Only unambiguous, single-valued comparisons
+surface on the page: where the frozen copy disagrees with today's number, the
+matching Advanced results carry a struck-out *was N* chip. Multi-valued
+regional comparisons are excluded. Dating it independently: the original's US set has
 Bobbie but not ByHeart, Bubs or Kendamil, all of which reached US shelves in
 2022; the retired page was still archived in 2023.
 
 This set contains 110 **`NOT COMPATIBLE`** rows — formulas that machine cannot
 dispense at all. No barcodes, no lot-number variants, no dates.
 
-It is published as its own artifact, `site/data/legacy_formula_pro.json`, rather
-than inside the live snapshot: it records the date it was crawled and carries no
-`generated` stamp, because re-dating frozen data on every monthly rebuild would
-claim a freshness it does not have. The page still offers it, behind the
-historical-reference link below the results.
+It is not published by the app. The raw crawl remains versioned under
+`data/legacy/` solely as a historical research artifact; current builds and the
+deployed page do not read, embed, search, or link its values as a lookup mode.

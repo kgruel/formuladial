@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 """Offline lookup for Baby Brezza powder settings.
 
-    ./lookup.py similac 360              # the Advanced line — the default
-    ./lookup.py kendamil -m pro          # the discontinued original, for the record
-    ./lookup.py --upc 070074680644       # barcode (Advanced data only)
-    ./lookup.py --brands -m pro -t Canada
+    ./lookup.py similac 360              # Advanced / Advanced WiFi / Mini
+    ./lookup.py --upc 070074680644       # barcode
     ./lookup.py similac --alt-only       # formulas with a lot-number variant
     ./lookup.py similac 360 --lot 11X    # numbers for a lot-11 Advanced
 
-Searches the Formula Pro Advanced line by default: the machine still sold and
-still maintained. The discontinued original Formula Pro is a separate, frozen
-file — `-m pro` reads it, `-m all` reads both. Results are tagged ADVANCED or
-PRO because the two machines mix differently and the numbers are not
-interchangeable. Matching is case- and accent-insensitive; every
-space-separated term must appear in "brand type stage".
+Searches only the current Formula Pro Advanced-family snapshot. The
+discontinued original Formula Pro is intentionally unavailable as a lookup;
+its frozen crawl remains under data/legacy/ solely as a historical artifact.
+Matching is case- and accent-insensitive; every space-separated term must
+appear in "brand type stage".
 """
 import argparse, json, os, re, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-# One file per machine: the live Advanced snapshot, and the frozen original.
-DATA = {"advanced": os.path.join(ROOT, "site/data/formula_settings.json"),
-        "pro": os.path.join(ROOT, "site/data/legacy_formula_pro.json")}
-TAG = {"advanced": "ADVANCED", "pro": "PRO"}
+DATA = {"advanced": os.path.join(ROOT, "site/data/formula_settings.json")}
+
+# These are the terminal confidence states. Text searches intentionally remain
+# candidate lists, but no lookup is actionable without a market and no
+# ambiguous result may expose settings as if one were authoritative.
+RESULT_STATES = ("unique", "ambiguous", "known_unavailable", "not_found")
 
 
 def fold(s):
@@ -30,16 +29,152 @@ def fold(s):
     return "".join(c for c in s if not unicodedata.combining(c)).casefold()
 
 
-def load(model):
-    """Records from one machine's file, tagged with the machine it is for."""
-    path = DATA[model]
+def barcode_digits(value):
+    """Return the digits in a barcode, ignoring spaces, dashes, and labels."""
+    return re.sub(r"[^0-9]", "", str(value or ""))
+
+
+def canonical_barcode(value):
+    """Normalize equivalent UPC-A/EAN-13 representations to one key.
+
+    A UPC-A is the 12-digit form of an EAN-13 whose first digit is zero.  The
+    API and scans use both forms, so normalization must be symmetric: either
+    a 12-digit query matches a stored 13-digit EAN, or a 13-digit query matches
+    a stored UPC.  Other lengths are retained verbatim because the crawl has
+    a few non-standard placeholder values; they should only match themselves.
+    """
+    digits = barcode_digits(value)
+    if len(digits) == 13 and digits.startswith("0"):
+        return digits[1:]
+    return digits
+
+
+def barcode_matches(query, candidate):
+    """Whether two barcode values identify the same UPC-A/EAN-13 code."""
+    wanted = canonical_barcode(query)
+    return bool(wanted) and wanted == canonical_barcode(candidate)
+
+
+def territory_matches(record, territory):
+    """Whether a record belongs to a requested territory substring."""
+    if not territory:
+        return True
+    wanted = fold(territory)
+    # ``_row_territories`` also understands the query-shaped rows used by the
+    # snapshot's optional unavailable list.  It is defined below; Python
+    # resolves this name when the function is called, after module loading.
+    return any(wanted in fold(t) for t in _row_territories(record))
+
+
+def filter_records(records, territory=None):
+    """Apply the same territory filter to text, brand, and barcode searches."""
+    return [r for r in records if territory_matches(r, territory)]
+
+
+def record_upcs(record, territory=None):
+    """Barcodes valid for the selected market, preserving source provenance."""
+    variants = record.get("territory_variants") or []
+    if not territory or not variants:
+        return record.get("upc", [])
+    upcs = []
+    for variant in variants:
+        if territory_matches(variant, territory):
+            upcs.extend(variant.get("upc", []))
+    return sorted(set(upcs))
+
+
+def barcode_hits(records, query, territory=None):
+    """Find barcode records, applying an optional territory filter first."""
+    return [r for r in filter_records(records, territory)
+            if any(barcode_matches(query, u) for u in record_upcs(r, territory))]
+
+
+def load_snapshot():
+    """Load the current snapshot, including its optional unavailable list."""
+    path = DATA["advanced"]
     if not os.path.exists(path):
         sys.exit(f"{path} not found — run the crawlers then build_dataset.py")
     with open(path) as f:
-        return [dict(r, model=model) for r in json.load(f)["records"]]
+        snapshot = json.load(f)
+    # Treat a missing list as an older snapshot, not as malformed data.  The
+    # builder publishes unavailable rows separately from usable dial records.
+    snapshot.setdefault("unavailable", [])
+    return snapshot
 
 
-def show(recs, territory_filter, lot=""):
+def load():
+    """Records from the current Advanced-family snapshot.
+
+    Kept as a small compatibility wrapper for callers that only need usable
+    settings.  Use :func:`load_snapshot` when a caller must distinguish a
+    known product with no published setting from a genuine miss.
+    """
+    return load_snapshot()["records"]
+
+
+def _row_territories(row):
+    """Territories from either a merged row or a raw unavailable row."""
+    territories = row.get("territories")
+    if territories:
+        return territories
+    # A future/older unavailable export may retain its crawl query instead of
+    # the normalized territories field.  Supporting it here keeps the CLI
+    # useful while the snapshot format evolves.
+    query = row.get("query")
+    return [query[0]] if isinstance(query, list) and query else []
+
+
+def unavailable_matches(rows, terms=None, query=None, territory=None):
+    """Find known products for which the snapshot has no dial setting.
+
+    ``rows`` is the snapshot's top-level ``unavailable`` list.  It is kept out
+    of ``records`` on purpose: callers must opt into this state and can never
+    accidentally print a missing setting as if it were a number.
+    """
+    rows = filter_records(rows, territory)
+    if query is not None:
+        return [r for r in rows
+                if any(barcode_matches(query, u) for u in r.get("upc", []))]
+    wanted = [fold(t) for t in (terms or []) if fold(t)]
+    return [r for r in rows if all(t in fold(" ".join(
+        str(r.get(k, "")) for k in ("brand", "type", "stage")))
+        for t in wanted)]
+
+
+def _effective_setting(record, lot=""):
+    """Return the setting that would be used by an Advanced lot, if known."""
+    if lot.strip().upper().startswith("11") and record.get("alt_setting") is not None:
+        return record["alt_setting"]
+    return record.get("setting")
+
+
+def setting_variants(records, lot=""):
+    """Distinct effective settings represented by records."""
+    return {_effective_setting(r, lot) for r in records}
+
+
+def classify_results(hits, unavailable=None, mode="text", territory=None, lot=""):
+    """Classify a lookup into a small, safety-oriented confidence contract.
+
+    Text searches can intentionally return a list of formula choices; multiple
+    hits are therefore ``ambiguous``. Barcode matches are exact-product
+    lookups, but two different effective settings are also ``ambiguous``.
+    As in the browser app, a missing territory keeps even one candidate
+    non-actionable. ``known_unavailable`` always wins when there is no usable
+    record, while an empty result is ``not_found``.
+    """
+    hits = list(hits or [])
+    unavailable = list(unavailable or [])
+    if not hits:
+        return "known_unavailable" if unavailable else "not_found"
+    if not territory:
+        return "ambiguous"
+    if mode == "barcode" and len(setting_variants(hits, lot)) > 1:
+        return "ambiguous"
+    return "unique" if len(hits) == 1 else "ambiguous"
+
+
+def show(recs, territory_filter, lot="", reveal=True, blocked_label="CHOOSE TIN"):
     """Print results. A lot number starting 11 selects Baby Brezza's alternate
     settings for Formula Pro Advanced and Advanced WiFi machines."""
     if not recs:
@@ -49,22 +184,29 @@ def show(recs, territory_filter, lot=""):
     w = max(len(f"{r['brand']} — {r['type']}") for r in recs)
     for r in recs:
         setting = r["alt_setting"] if (alt_active and "alt_setting" in r) else r["setting"]
+        if not reveal:
+            # Keep identifying candidate details visible, but never print a
+            # number that could be copied into the machine before the market
+            # and exact tin have been resolved.
+            setting = blocked_label
         # The dial runs 1-10, so a published 0 is not a number to turn it to.
         if isinstance(setting, int) and setting > 0:
             cell = f"setting {setting:>2}"
         else:
             cell = f"{'NO DIAL POSITION' if setting == 0 else setting:>16}"
         stage = f"stage {r['stage']}" if r["stage"] else "no stage"
-        if "alt_setting" not in r:
+        if not reveal:
+            alt = ""
+        elif "alt_setting" not in r:
             alt = ""
         elif alt_active:
             alt = f"   [standard machine: {r['setting']}]"
         else:
             alt = f"   [lot 11… → {r['alt_setting']}]"
-        print(f"  {TAG[r['model']]:<8} {cell}   "
+        print(f"  {'ADVANCED':<8} {cell}   "
               f"{r['brand'] + ' — ' + r['type']:<{w}}  {stage}{alt}")
         if not territory_filter:
-            t = r["territories"]
+            t = _row_territories(r)
             where = ", ".join(t) if len(t) <= 4 else f"{', '.join(t[:3])} +{len(t)-3} more"
             print(f"{'':>11}{where}")
 
@@ -73,10 +215,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("terms", nargs="*", help="words to match against brand/type/stage")
-    p.add_argument("--upc", help="barcode on the tin (Formula Pro Advanced data only)")
-    p.add_argument("-m", "--model", choices=["pro", "advanced", "all"], default="advanced",
-                   help="which machine (default: advanced, the line still sold; "
-                        "pro is the discontinued original's historical record)")
+    p.add_argument("--upc", help="barcode on the tin")
     p.add_argument("-t", "--territory", help="restrict to a territory (substring)")
     p.add_argument("--brands", action="store_true", help="list brands instead of settings")
     p.add_argument("--lot", default="",
@@ -87,22 +226,19 @@ def main():
     a = p.parse_args()
 
     terr = fold(a.territory) if a.territory else None
-    recs = [r for m in (["advanced", "pro"] if a.model == "all" else [a.model])
-            for r in load(m)]
+    snapshot = load_snapshot()
+    recs = snapshot["records"]
+    unavailable = snapshot.get("unavailable", [])
     if a.alt_only:
         recs = [r for r in recs if "alt_setting" in r]
-    if terr:
-        recs = [r for r in recs if any(terr in fold(t) for t in r["territories"])]
+        unavailable = []
+    recs = filter_records(recs, a.territory)
+    unavailable = filter_records(unavailable, a.territory)
 
     if a.upc:
-        want = re.sub(r"[^0-9]", "", a.upc)
-        alt = want[1:] if len(want) == 13 and want.startswith("0") else None
-        hits = [r for r in recs
-                if any(re.sub(r"[^0-9]", "", u) in (want, alt) for u in r["upc"])]
-        if not hits and a.model == "pro":
-            print("The original Formula Pro dataset carries no barcodes — "
-                  "search by brand name instead.")
-            return
+        hits = barcode_hits(recs, a.upc, a.territory)
+        unavailable_hits = unavailable_matches(unavailable, query=a.upc)
+        mode = "barcode"
     elif a.brands:
         names = sorted({r["brand"] for r in recs}, key=fold)
         print("\n".join(names) or "No brands for that filter.")
@@ -113,18 +249,58 @@ def main():
         terms = [fold(t) for t in a.terms]
         hits = [r for r in recs
                 if all(t in fold(f"{r['brand']} {r['type']} {r['stage']}") for t in terms)]
+        unavailable_hits = unavailable_matches(unavailable, terms=terms)
+        mode = "text"
+
+    state = classify_results(hits, unavailable_hits, mode=mode,
+                             territory=a.territory, lot=a.lot)
 
     if a.json:
-        print(json.dumps(hits, indent=2, ensure_ascii=False))
-        return
-    show(hits, terr, a.lot)
-    if hits:
-        models = {r["model"] for r in hits}
-        print(f"\n  {len(hits)} result(s).", end="")
-        if models == {"advanced", "pro"}:
-            print("  PRO and ADVANCED numbers are not interchangeable.")
+        # Preserve the historical list shape for successful, non-ambiguous
+        # lookups.  The explicit envelope is used whenever the result needs a
+        # confidence explanation, so scripts cannot mistake an omission for a
+        # genuine no-match.
+        if state == "unique":
+            print(json.dumps(hits, indent=2, ensure_ascii=False))
         else:
-            print(f"  {TAG[models.pop()]} only.")
+            safe_hits = hits
+            if state == "ambiguous":
+                safe_hits = [{k: v for k, v in r.items()
+                              if k not in ("setting", "alt_setting")} for r in hits]
+            print(json.dumps({"state": state, "results": safe_hits,
+                              "unavailable": unavailable_hits},
+                             indent=2, ensure_ascii=False))
+        return
+
+    if state == "known_unavailable":
+        print("Known formula, but Baby Brezza publishes no usable dial setting "
+              "for it in this snapshot. Do not guess a number; contact Baby Brezza.")
+        for r in unavailable_hits:
+            label = " — ".join(str(r.get(k, "")) for k in ("brand", "type") if r.get(k))
+            stage = f"  stage {r['stage']}" if r.get("stage") else ""
+            reason = f" ({r['reason']})" if r.get("reason") else ""
+            print(f"  {label}{stage}{reason}")
+        return
+    if state == "not_found":
+        print("No match.")
+        return
+    if state == "ambiguous":
+        if not a.territory:
+            print("Choose the market with --territory before using a dial number.")
+            blocked_label = "CHOOSE TERRITORY"
+        elif mode == "barcode":
+            print("Barcode matches multiple tins or settings in the selected territory. "
+                  "Refine the lookup or verify the tin with Baby Brezza.")
+            blocked_label = "CHOOSE TIN"
+        else:
+            print("Several formulas match. Refine the search to the exact tin before "
+                  "using a dial number.")
+            blocked_label = "CHOOSE TIN"
+        show(hits, terr, a.lot, reveal=False, blocked_label=blocked_label)
+    else:
+        show(hits, terr, a.lot)
+    if hits:
+        print(f"\n  {len(hits)} result(s).  ADVANCED family only.")
 
 
 if __name__ == "__main__":

@@ -19,14 +19,24 @@ lock = threading.Lock()
 
 
 def done():
+    """Images with a successful HEAD response."""
     if not os.path.exists(OUT):
         return set()
     seen = set()
     with open(OUT) as f:
         for line in f:
             try:
-                seen.add(json.loads(line)["image"])
-            except ValueError:
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    continue
+                # Retain failures in JSONL for diagnosis, but retry them on
+                # the next invocation.  This includes rows from older runs.
+                if row.get("error"):
+                    continue
+                if "last_modified" not in row or "bytes" not in row:
+                    continue
+                seen.add(row["image"])
+            except (KeyError, TypeError, ValueError):
                 continue
     return seen
 

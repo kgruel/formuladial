@@ -4,7 +4,8 @@
 `data/raw/image_dates.jsonl`.  That file is the authority for *what images
 exist* and for what upstream last said about each one; this walks the same
 list one step further -- GET the bytes, archive the original under
-`data/raw/images/`, and cut a 128px WebP into `site/thumbs/`.  There is no
+`data/raw/images/`, and cut a 256px WebP into `site/thumbs/`.  The page uses
+the same lazy-loaded file for its compact row image and its enlarged preview. There is no
 second discovery path: an image that is not in `image_dates.jsonl` is not
 fetched, so the two layers can never disagree about the set.
 
@@ -48,7 +49,7 @@ ORIG_DIR = "data/raw/images"
 THUMB_DIR = "site/thumbs"
 MANIFEST = "site/thumbs/manifest.json"
 
-MAX_EDGE = 128          # the page draws 52px and 44px boxes; 128 covers 2x
+MAX_EDGE = 256          # also serves the hover/tap product preview
 QUALITY = 80
 POOL = 10               # same pacing as the other crawlers
 MAX_BODY = 32 << 20     # a product photo is ~215KB; anything near this is wrong
@@ -57,7 +58,7 @@ lock = threading.Lock()
 
 
 def authority():
-    """filename -> {"last_modified", "bytes"}, from the HEAD sweep."""
+    """Filename -> source metadata plus the required preview edge."""
     rows = {}
     with open(SRC) as f:
         for line in f:
@@ -68,7 +69,7 @@ def authority():
             if r.get("error"):
                 continue
             rows[r["image"]] = {"last_modified": r.get("last_modified"),
-                                "bytes": r.get("bytes")}
+                                "bytes": r.get("bytes"), "thumb_edge": MAX_EDGE}
     return rows
 
 
@@ -91,8 +92,13 @@ def save_manifest(m):
     os.replace(tmp, MANIFEST)
 
 
+def thumb_stem(image):
+    """The `<stem>` half of `site/thumbs/<stem>.webp` -- build_page.py builds a src from it."""
+    return image.rsplit(".", 1)[0]
+
+
 def thumb_path(image):
-    return os.path.join(THUMB_DIR, image.rsplit(".", 1)[0] + ".webp")
+    return os.path.join(THUMB_DIR, thumb_stem(image) + ".webp")
 
 
 def pending(auth=None, have=None):

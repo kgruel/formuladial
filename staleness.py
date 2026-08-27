@@ -49,16 +49,24 @@ def main():
                 frozen[(norm(r["brand"]), norm(e["type"]), norm(stage))].add(setting_of(setting))
 
     both = set(live) & set(frozen)
-    changed = sorted(k for k in both if live[k] != frozen[k])
-    pct = 100 * len(changed) / len(both) if both else 0
+    # A name can describe different regional products.  Without a territory
+    # mapping between the two backends, a multi-valued set is not evidence that
+    # one particular product changed.  Keep those cases out of both the rate
+    # and the per-result "was" annotations.
+    comparable = {k for k in both if len(live[k]) == 1 and len(frozen[k]) == 1}
+    ambiguous = both - comparable
+    changed = sorted(k for k in comparable if live[k] != frozen[k])
+    pct = 100 * len(changed) / len(comparable) if comparable else 0
     print(f"frozen Advanced entries : {len(frozen)}")
     print(f"live   Advanced entries : {len(live)}")
-    print(f"comparable on exact name: {len(both)}")
+    print(f"unambiguous exact-name comparisons: {len(comparable)}")
+    print(f"ambiguous regional sets excluded  : {len(ambiguous)}")
     print(f"settings changed        : {len(changed)}  ({pct:.0f}%)")
     print("\nexamples:")
     for k in changed[:15]:
         print(f"  {k[0]} / {k[1]} / {k[2] or '-'}: {sorted(frozen[k])} -> {sorted(live[k])}")
-    json.dump({"comparable": len(both), "changed": len(changed), "pct": round(pct),
+    json.dump({"comparable": len(comparable), "ambiguous_excluded": len(ambiguous),
+               "changed": len(changed), "pct": round(pct),
                "examples": [{"brand": k[0], "type": k[1], "stage": k[2],
                              "was": sorted(map(str, frozen[k])),
                              "now": sorted(map(str, live[k]))} for k in changed]},

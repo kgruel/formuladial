@@ -43,12 +43,27 @@ def resume():
                 r = json.loads(line)
             except ValueError:
                 continue
-            q = tuple(r["query"])
-            asked.add(q)
+            if not isinstance(r, dict):
+                continue
+            if r.get("error") not in (None, "no-match"):
+                continue
+            try:
+                q = tuple(r["query"])
+            except (KeyError, TypeError):
+                continue
             rec = r.get("record")
-            if rec:
+            # A well-formed record is an answer.  So is the endpoint's
+            # explicit no-match.  Network/HTTP failures and malformed rows are
+            # intentionally left out so they are retryable on resume.
+            if isinstance(rec, dict) and all(
+                    k in rec for k in ("brand", "type", "stage", "territory", "setting")):
+                asked.add(q)
                 key = (rec["brand"], rec["type"], rec["stage"])
                 covered.setdefault(key, set()).update(rec.get("territory") or [])
+            elif r.get("no_match") is True or r.get("error") == "no-match":
+                asked.add(q)
+            else:
+                continue
     return asked
 
 
@@ -68,15 +83,29 @@ def main():
             if terr in covered.get(key, ()):        # already answered losslessly
                 skipped[0] += 1
                 return
-        try:
-            rec = get("settings", territory=terr, brand=brand, type=typ,
-                      stage=stage, alt_mfg_setting="false")
-            err = None
-        except EmptyResponse:
-            rec, err = None, "no-match"
-        except Exception as e:
-            rec, err = None, str(e)
+        # The catalogue sometimes exposes a type with no stages. Its settings
+        # endpoint requires a non-empty stage and deterministically answers 400
+        # (the direct origin says {"error":"stage is required"}). This is an
+        # upstream catalogue gap, not a transport failure to retry forever.
+        if stage == "":
+            rec, err = None, None
+            no_match = True
+        else:
+            try:
+                rec = get("settings", territory=terr, brand=brand, type=typ,
+                          stage=stage, alt_mfg_setting="false")
+                err = None
+            except EmptyResponse:
+                rec, err = None, None
+                no_match = True
+            except Exception as e:
+                rec, err = None, str(e)
+                no_match = False
+            else:
+                no_match = False
         out = {"query": list(q), "record": rec}
+        if no_match:
+            out["no_match"] = True
         if err:
             out["error"] = err
         with lock:

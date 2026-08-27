@@ -131,19 +131,20 @@ jobs:
       - name: Build the dataset, the page and the watch baseline
         if: steps.crawl.outputs.status == 'complete'
         run: |
+          # Bind the human-facing "seen in Baby Brezza data" date to this
+          # exact completed raw crawl; build_dataset verifies the hash.
+          python3 scripts/record_observation.py
           python3 build_dataset.py
+          # The page embeds the historical change annotations, so regenerate
+          # them against this snapshot before building the page.
+          python3 staleness.py
           python3 build_page.py
           python3 scripts/watch.py --write-baseline
-          python3 staleness.py > /dev/null 2>&1 || true
           # data/raw/ is untracked, so a CI checkout starts with no crawl output
-          # at all; every loader in build_dataset.py treats a missing input as
-          # "no rows" rather than an error. Refuse to publish either artifact
-          # collapsed to that (the legacy file builds from versioned inputs and
-          # should never trip this; checking it guards code bugs, not data/raw/).
+          # at all. Refuse to publish a collapsed current snapshot.
           python3 - <<'PY'
           import json, sys
-          files = {"advanced": "site/data/formula_settings.json",
-                   "pro": "site/data/legacy_formula_pro.json"}
+          files = {"advanced": "site/data/formula_settings.json"}
           c = {k: json.load(open(p))["counts"]["records"] for k, p in files.items()}
           bad = [k for k, n in c.items() if n < 1000]
           if bad:
@@ -159,7 +160,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Only site/ and the tripwire baseline; data/raw/ stays untracked.
           git add -- site data/watch_baseline.json \
-                     data/brands_by_territory.json data/staleness.json
+                     data/brands_by_territory.json data/staleness.json \
+                     data/crawl_observation.json data/setting_history.json
           if git diff --cached --quiet; then
             echo "committed=false" >> "$GITHUB_OUTPUT"
             echo "snapshot unchanged; nothing to commit"
