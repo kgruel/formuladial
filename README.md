@@ -43,6 +43,10 @@ what is and isn't consent-gated — are in
 
 * **3,867 Formula Pro Advanced settings** across 78 countries, searchable by
   brand, formula name, or barcode.
+* **Evidence when a number has moved.** Baby Brezza revises settings with no
+  change log or notice. Compared against a frozen ~2022 copy of their own data,
+  81 of 299 comparable settings had changed — those results carry a struck-out
+  "was" chip on the page.
 * **Lot-11 alternates.** Advanced and Advanced WiFi machines whose lot number
   (sticker underneath) starts with 11 use different numbers for 99 formulas —
   including Similac 360, Enfamil NeuroPro Gentlease, and Kirkland ProCare.

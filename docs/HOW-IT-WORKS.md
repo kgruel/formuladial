@@ -161,7 +161,9 @@ line that *is* still maintained, which makes it measurable:
 
 Assuming both halves froze together, ~27% is the best estimate of how far the
 original's numbers have drifted. It is an estimate, not a correction — there is
-nothing to check them against. Dating it independently: the original's US set has
+nothing to check them against. The 81 changed settings also surface on the page
+itself: where the frozen copy disagrees with today's number, the matching
+Advanced results carry a struck-out *was N* chip. Dating it independently: the original's US set has
 Bobbie but not ByHeart, Bubs or Kendamil, all of which reached US shelves in
 2022; the retired page was still archived in 2023.
 
