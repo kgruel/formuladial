@@ -137,6 +137,32 @@ input::placeholder{color:var(--ink-3)}
   font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-3); flex:none;
 }
+.scan{
+  font:inherit; font-family:"IBM Plex Mono",monospace; font-size:11px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--accent-ink);
+  background:var(--accent-soft); border:1px solid transparent; border-radius:7px;
+  padding:6px 10px; cursor:pointer; flex:none; display:flex; align-items:center; gap:6px;
+}
+.scan:hover{border-color:var(--accent)}
+.scan svg{width:15px; height:15px}
+.scanner{
+  position:fixed; inset:0; z-index:50; background:rgba(10,14,17,.6);
+  display:grid; place-items:center; padding:16px;
+}
+.scanner[hidden]{display:none}
+.scanbox{
+  width:min(540px,100%); background:var(--surface); border:1px solid var(--line);
+  border-radius:14px; overflow:hidden; box-shadow:var(--shadow);
+}
+.scanhead{
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:11px 14px; font-size:13px; color:var(--ink-2);
+}
+.viewport{position:relative; background:#000; min-height:260px}
+.viewport video,.viewport canvas{display:block; width:100%; height:auto}
+.viewport canvas{position:absolute; inset:0; height:100%}
+.scanstate{margin:0; padding:11px 14px; font-size:13.5px; color:var(--ink-2)}
+.scanstate:empty{display:none}
 .lotrow{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .lotfield{flex:0 1 300px}
 .lotfield input{cursor:text; text-transform:uppercase}
@@ -321,6 +347,13 @@ footer{
       <input id="q" type="search" autocomplete="off" spellcheck="false"
              aria-label="Search by brand, formula name, or barcode">
       <span class="tag" id="mode" hidden>Barcode</span>
+      <button class="scan" id="scan" type="button" hidden
+              title="Scan the barcode with your camera — decoded on your device">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v2m-4 12h2a2 2 0 0 0 2-2v-2M8 9v6m3-6v6m3-6v6"></path>
+        </svg>
+        Scan
+      </button>
     </div>
     <div class="terr">
       <label for="terr">Sold in</label>
@@ -462,10 +495,22 @@ footer{
   </details>
   <p style="margin-top:14px"><strong>This page has no analytics, no cookies, and no
   server.</strong> Every setting is already inside the file your browser downloaded;
-  searching runs locally, and your lot number stays in this tab.</p>
+  searching runs locally, and your lot number stays in this tab. The barcode scanner
+  is on-device too: camera frames are decoded in your browser and never uploaded.</p>
 </section>
 
 <footer id="foot"></footer>
+</div>
+
+<div class="scanner" id="scanner" hidden role="dialog" aria-modal="true" aria-label="Barcode scanner">
+  <div class="scanbox">
+    <div class="scanhead">
+      <span>Runs on your phone &mdash; camera frames never leave it.</span>
+      <button class="chip" id="scanclose" type="button">Close</button>
+    </div>
+    <div class="viewport" id="viewport"></div>
+    <p class="scanstate" id="scanstate"></p>
+  </div>
 </div>
 
 <script>
@@ -558,6 +603,8 @@ function applyModel(){
   // Only Advanced and Advanced WiFi take the lot-number branch; the Mini and
   // the original never do.
   $lotrow.hidden = model !== "advanced";
+  // The original's data carries no barcodes, so no scanner there either.
+  $scan.hidden = !(model === "advanced" && canScan);
   syncLot();
   $q.placeholder = model === "pro"
     ? "Kendamil, HiPP Combiotic, Enfamil Gentlease…"
@@ -600,14 +647,17 @@ function search(){
   const mine = i => MODEL_KEY[D.R[i][0]] === model;
 
   if (isBarcode(raw)){
-    const want = digits(raw);
-    const alt = want.length === 13 && want[0] === "0" ? want.slice(1) : null;
+    // Same tin, two spellings: scanners hand back 12-digit UPC-A or 13-digit
+    // EAN with a leading 0, and the dataset stores a mix of both. Canonicalise
+    // BOTH sides before comparing — Baby Brezza's own API is exact-string here
+    // and misses its own records when the forms differ.
+    const canon = d => d.length === 13 && d[0] === "0" ? d.slice(1) : d;
+    const want = canon(digits(raw));
     const hits = [];
     for (let i = 0; i < D.R.length; i++){
       if (!mine(i)) continue;
       for (const u of D.R[i][6]){
-        const d = digits(u);
-        if (d === want || (alt && d === alt)){ hits.push(i); break }
+        if (canon(digits(u)) === want){ hits.push(i); break }
       }
     }
     // A barcode identifies the tin, so country never narrows it further.
@@ -769,6 +819,118 @@ function syncLot(){
 }
 
 $lot.addEventListener("input", () => { syncLot(); run() });
+
+// ---- barcode scanner ----
+// Native BarcodeDetector where it actually has a backend (Chromium); otherwise
+// the library the official page uses, in its maintained fork
+// (vendor/quagga2-1.12.1.min.js), loaded same-origin only when asked for.
+// Frames are decoded on-device; nothing is uploaded.
+const $scan=el("scan"), $scanner=el("scanner"), $viewport=el("viewport"),
+      $scanstate=el("scanstate"), $scanclose=el("scanclose");
+const canScan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+let scanStop = null, lastRead = "";
+
+const scanMsg = t => { $scanstate.textContent = t };
+
+function acceptCode(code){
+  code = (code || "").trim();
+  if (!code) return;
+  if (code !== lastRead){ lastRead = code; return }  // same code twice, like theirs
+  closeScanner();
+  $q.value = code;
+  run();
+}
+
+function cameraError(e){
+  const n = e && e.name;
+  const fallback = "Type the digits printed under the barcode lines instead.";
+  if (n === "NotAllowedError" || n === "SecurityError")
+    return "Camera permission was declined. " + fallback;
+  if (n === "NotFoundError" || n === "OverconstrainedError")
+    return "No usable camera found. " + fallback;
+  return "The camera didn't start. " + fallback;
+}
+
+async function nativeWorks(){
+  if (!("BarcodeDetector" in window)) return false;
+  try{
+    const f = await BarcodeDetector.getSupportedFormats();
+    return f.includes("ean_13") && f.includes("upc_a");
+  }catch(e){ return false }
+}
+
+async function scanNative(){
+  const detector = new BarcodeDetector({formats:["upc_a","ean_13"]});
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+  const video = document.createElement("video");
+  video.setAttribute("playsinline",""); video.muted = true; video.srcObject = stream;
+  $viewport.replaceChildren(video);
+  await video.play();
+  // Some builds expose the interface with no detection backend: the first
+  // detect() rejects. Fall back to Quagga rather than spinning silently.
+  try{ await detector.detect(video) }
+  catch(e){ stream.getTracks().forEach(t => t.stop()); $viewport.replaceChildren(); return false }
+  scanMsg("Point the camera at the barcode.");
+  let live = true;
+  scanStop = () => { live = false; stream.getTracks().forEach(t => t.stop()) };
+  const tick = async () => {
+    if (!live) return;
+    try{
+      const found = await detector.detect(video);
+      if (found.length) acceptCode(found[0].rawValue);
+    }catch(e){}
+    if (live) requestAnimationFrame(tick);
+  };
+  tick();
+  return true;
+}
+
+const loadQuagga = () => window.Quagga ? Promise.resolve()
+  : new Promise((ok, fail) => {
+      const s = document.createElement("script");
+      s.src = "vendor/quagga2-1.12.1.min.js";
+      s.onload = ok; s.onerror = () => fail(new Error("scanner script failed to load"));
+      document.head.appendChild(s);
+    });
+
+async function scanQuagga(){
+  await loadQuagga();
+  await new Promise((ok, fail) => Quagga.init({
+    inputStream:{name:"Live", type:"LiveStream", target:$viewport,
+                 constraints:{facingMode:"environment"}},
+    decoder:{readers:["upc_reader","ean_reader"]},   // the official page's set
+    locate:true, frequency:20,
+    numOfWorkers: navigator.hardwareConcurrency || 1,
+  }, err => err ? fail(err) : ok()));
+  Quagga.start();
+  scanMsg("Point the camera at the barcode.");
+  const onDet = r => acceptCode(r.codeResult && r.codeResult.code);
+  Quagga.onDetected(onDet);
+  scanStop = () => { Quagga.offDetected(onDet); Quagga.stop() };
+}
+
+async function openScanner(){
+  lastRead = "";
+  $scanner.hidden = false;
+  $scanclose.focus();
+  scanMsg("Starting camera…");
+  try{
+    if (!(await nativeWorks() && await scanNative())) await scanQuagga();
+  }catch(e){ scanMsg(cameraError(e)) }
+}
+
+function closeScanner(){
+  if (scanStop){ try{ scanStop() }catch(e){} scanStop = null }
+  $scanner.hidden = true;
+  $viewport.replaceChildren();
+  scanMsg("");
+  $q.focus();
+}
+
+$scan.addEventListener("click", openScanner);
+$scanclose.addEventListener("click", closeScanner);
+$scanner.addEventListener("click", e => { if (e.target === $scanner) closeScanner() });
+addEventListener("keydown", e => { if (e.key === "Escape" && !$scanner.hidden) closeScanner() });
 
 let timer;
 $q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 90) });

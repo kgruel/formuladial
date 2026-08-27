@@ -42,7 +42,8 @@ what is and isn't consent-gated — are in
 ## What's in it
 
 * **3,867 Formula Pro Advanced settings** across 78 countries, searchable by
-  brand, formula name, or barcode.
+  brand, formula name, or barcode — typed or scanned with your phone's camera,
+  decoded on-device.
 * **Evidence when a number has moved.** Baby Brezza revises settings with no
   change log or notice. Compared against a frozen ~2022 copy of their own data,
   81 of 299 comparable settings had changed — those results carry a struck-out

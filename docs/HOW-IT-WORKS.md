@@ -42,6 +42,19 @@ Unauthenticated GETs. The Canadian site proxies them at
 
 The origin 403s requests without a browser `User-Agent`.
 
+**`settings/upc` is exact-string, and it misses its own data.** Verified live:
+`upc=300875126400` returns Enfamil A2 Premium; the same barcode in 13-digit EAN
+form, `upc=0300875126400`, returns nothing. The official page's scanner
+(QuaggaJS with `upc_reader` + `ean_reader`, behind the same email gate) hands
+back exactly that 13-digit form for US tins, so a perfect scan can still show
+"No Results Found For Barcode". The dataset itself stores a mix — 3,124
+thirteen-digit codes against 674 twelve-digit — so our page canonicalises both
+sides of the comparison (a leading 0 on a 13-digit code is dropped) before
+matching. Our scanner uses the native `BarcodeDetector` where it has a real
+backend, and otherwise the same Quagga in its maintained fork
+(`site/vendor/quagga2-1.12.1.min.js`, MIT), loaded same-origin on demand;
+frames are decoded on-device.
+
 ## One dataset, three machines — and a fourth dimension
 
 No model is ever sent. Advanced, Advanced WiFi and Mini build identical
