@@ -82,6 +82,8 @@ h1{
 .pick .d{font-size:12.5px; color:var(--ink-3); line-height:1.35}
 .pick button[aria-pressed="true"] .d{color:var(--accent-ink); opacity:.85}
 .machine .note{margin:12px 0 0; font-size:13.5px; color:var(--ink-2)}
+header .note{margin:14px 0 0; font-size:13.5px; color:var(--ink-2); max-width:60ch}
+footer a{color:var(--ink-2)}
 
 /* ---- controls ---- */
 .controls{
@@ -263,11 +265,14 @@ footer{
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">Baby Brezza powder settings</div>
+  <div class="eyebrow">Unofficial &mdash; not affiliated with Baby Brezza</div>
   <h1>What number does this tin need?</h1>
   <p class="lede">Every powder setting Baby Brezza publishes, including the alternate
     numbers your machine's lot number unlocks and the discontinued original their finder
-    no longer offers. No email, no lookup limit.</p>
+    no longer offers. No email, no lookup limit, and nothing you type leaves this tab.</p>
+  <p class="note"><strong>Check the number against your own tin before mixing a
+    bottle</strong> &mdash; this is infant food prep, and manufacturers reformulate.
+    Dates shown here mean "not touched since", never "verified on".</p>
 </header>
 
 <section class="machine">
@@ -621,7 +626,11 @@ el("foot").innerHTML =
   `${D.M.pro.counts.records.toLocaleString()} settings for the discontinued original, ` +
   `${D.M.pro.counts.not_compatible} of which that machine cannot dispense at all. ` +
   `Dates track when a record's image was last replaced, which is a "not touched since" ` +
-  `signal rather than a "checked on" one.`;
+  `signal rather than a "checked on" one.` +
+  `<p style="margin-top:10px">Unofficial and not affiliated with Baby Brezza. ` +
+  `All numbers come from Baby Brezza's own public data &mdash; ` +
+  `<a href="https://github.com/USER/REPO">source and dataset</a> &middot; ` +
+  `<a href="https://github.com/USER/REPO/blob/main/docs/HOW-IT-WORKS.md">how it works</a>.</p>`;
 
 function syncLot(){
   const raw = $lot.value.trim().toUpperCase();
