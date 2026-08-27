@@ -62,6 +62,7 @@ python3 build_dataset.py || { emit incomplete; exit 0; }
 
 layer alt    python3 crawlers/crawl_alt.py    || { emit incomplete; exit 0; }
 layer images python3 crawlers/crawl_images.py || { emit incomplete; exit 0; }
+layer thumbs python3 crawlers/fetch_images.py || { emit incomplete; exit 0; }
 
 # The legacy backend is frozen -- crawled once, kept as a historical record.
 # It is deliberately not part of any schedule.

@@ -1,0 +1,6 @@
+# The crawl and the page build are stdlib-only.  Pillow is the single
+# exception: crawlers/fetch_images.py needs an encoder to cut the committed
+# thumbnails in site/thumbs/.  It is imported lazily, inside the encode, so
+# `scripts/remaining.py thumbs` can still answer "is this layer done?"
+# without it.
+pillow>=11

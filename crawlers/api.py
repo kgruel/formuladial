@@ -81,3 +81,30 @@ def head(url, retries=3):
             last = e
             time.sleep(1.5 * (i + 1))
     raise last
+
+
+def fetch(url, retries=2):
+    """GET a binary asset with the same browser headers: `(body, headers)`.
+
+    Here for the same reason `head` is -- one place that knows how to talk to
+    the origin, so the image walk does not hand-roll a second urllib request.
+
+    Two deliberate differences from `get`: the body is returned untouched, and
+    an HTTP status is never retried.  The origin answers *unknown* paths with
+    200 and an HTML page, so "is this actually an image" cannot be settled
+    here; that check belongs to the caller, which has to decode the bytes
+    anyway.
+    """
+    hdrs = dict(HEADERS, Accept="image/avif,image/webp,image/*,*/*;q=0.8")
+    last = None
+    for i in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=hdrs)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.read(), dict(r.headers)
+        except urllib.error.HTTPError:
+            raise                                   # 404/403 are answers, not flakes
+        except Exception as e:
+            last = e
+            time.sleep(1.5 * (i + 1))
+    raise last

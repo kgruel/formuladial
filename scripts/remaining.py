@@ -60,9 +60,16 @@ def images_remaining():
     return len(imgs - crawl_images.done())
 
 
+def thumbs_remaining():
+    # Its own resume logic, like every other layer here -- and answerable
+    # without Pillow, which fetch_images.py imports only to encode.
+    import fetch_images
+    return len(fetch_images.pending())
+
+
 LAYERS = {"types": types_remaining, "stages": stages_remaining,
           "settings": settings_remaining, "alt": alt_remaining,
-          "images": images_remaining}
+          "images": images_remaining, "thumbs": thumbs_remaining}
 
 
 def main(argv):

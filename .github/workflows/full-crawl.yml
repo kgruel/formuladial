@@ -56,6 +56,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Pillow
+        # The one non-stdlib dependency; crawlers/fetch_images.py needs it to
+        # cut the committed thumbnails. Every other script is stdlib-only.
+        run: pip install -r requirements.txt
+
       - name: Start of a cycle -- refresh the crawl's root input
         # crawl_types.py walks data/brands_by_territory.json, so a stale copy
         # would make the whole loop unable to converge: the tripwire spots a new
