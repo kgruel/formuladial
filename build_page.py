@@ -40,13 +40,14 @@ def pack(data):
                      r["stage"], r["setting"], format(mask, "x"), r["upc"],
                      r.get("alt_setting"), r.get("updated"), w])
     return {"T": terrs, "B": brands, "R": rows,
-            "M": {k: {"label": v["label"], "note": v["note"], "counts": v["counts"]}
+            "M": {k: {"label": v["label"], "counts": v["counts"]}
                   for k, v in data["models"].items()}}
 
 
 TEMPLATE = r"""<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Brezza Setting Finder</title>
+<title>Formula Dial &mdash; Baby Brezza formula settings</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='41' fill='%23f6e6cd' stroke='%23c9821a' stroke-width='9'/><line x1='50' y1='50' x2='50' y2='17' stroke='%235a3a08' stroke-width='10' stroke-linecap='round' transform='rotate(216 50 50)'/><circle cx='50' cy='50' r='7' fill='%235a3a08'/></svg>">
 <script>
 /* Before first paint: a stored theme choice must not flash the other one. */
 try{var _t=localStorage.getItem("brezza.theme");
@@ -54,7 +55,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap">
 <style>
 :root{
   color-scheme:light;
@@ -62,7 +63,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
   --ink:#1c2329; --ink-2:#4c565e; --ink-3:#7b858d;
   --line:#dbd7d0; --line-2:#c9c4bb;
   --accent:#0f6d72; --accent-soft:#d9e8e7; --accent-ink:#0a4a4e;
-  --dial:#c9821a; --dial-ink:#5a3a08; --dial-soft:#f6e6cd;
+  --dial:#c9821a; --dial-ink:#5a3a08; --dial-soft:#f6e6cd; --needle:#5a3a08;
   --stop:#9c3328; --stop-soft:#f4dedb; --stop-ink:#7c2820;
   --focus:#0f6d72;
   --shadow:0 1px 2px rgba(28,35,41,.06),0 6px 18px rgba(28,35,41,.05);
@@ -70,11 +71,11 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --ground:#12171b; --surface:#1a2126; --raised:#232b31;
-    --ink:#eceae6; --ink-2:#a8b1b7; --ink-3:#77828a;
-    --line:#2c353b; --line-2:#3b464d;
-    --accent:#5fc8c8; --accent-soft:#173436; --accent-ink:#9fe0df;
-    --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#3a2c14;
+    --ground:#191410; --surface:#221c15; --raised:#2c241a;
+    --ink:#ede6da; --ink-2:#b3a996; --ink-3:#8f877a;
+    --line:#332b20; --line-2:#46392a;
+    --accent:#5fc8c8; --accent-soft:#1b3531; --accent-ink:#9fe0df;
+    --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#403012; --needle:#ede6da;
     --stop:#e0857a; --stop-soft:#3a201d; --stop-ink:#f2bdb6;
     --focus:#5fc8c8;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
@@ -82,11 +83,11 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --ground:#12171b; --surface:#1a2126; --raised:#232b31;
-  --ink:#eceae6; --ink-2:#a8b1b7; --ink-3:#77828a;
-  --line:#2c353b; --line-2:#3b464d;
-  --accent:#5fc8c8; --accent-soft:#173436; --accent-ink:#9fe0df;
-  --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#3a2c14;
+  --ground:#191410; --surface:#221c15; --raised:#2c241a;
+  --ink:#ede6da; --ink-2:#b3a996; --ink-3:#8f877a;
+  --line:#332b20; --line-2:#46392a;
+  --accent:#5fc8c8; --accent-soft:#1b3531; --accent-ink:#9fe0df;
+  --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#403012; --needle:#ede6da;
   --stop:#e0857a; --stop-soft:#3a201d; --stop-ink:#f2bdb6;
   --focus:#5fc8c8;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
@@ -101,14 +102,22 @@ body{
 .wrap{max-width:860px; margin:0 auto; padding:0 20px 72px}
 :focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:4px}
 
-header{padding:40px 0 20px}
+header{padding:32px 0 18px}
+.brandrow{display:flex; gap:12px; align-items:center}
+.brand{
+  font-family:"Zilla Slab",serif; font-weight:700; font-size:21px;
+  letter-spacing:-.01em; color:var(--ink); display:flex; align-items:baseline;
+}
+.brand .ti{position:relative; display:inline-block}
+.brand .ti svg{position:absolute; top:1px; left:50%; margin-left:-3.5px; width:7px; height:7px}
+.rule{flex:1; height:1px; background:var(--line)}
 .eyebrow{
   font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
   letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
-  display:flex; gap:10px; align-items:center;
+  margin-top:12px;
 }
-.eyebrow::after{content:none}
-.eyebrow .rule{flex:1; height:1px; background:var(--line)}
+.hgrid{display:grid; grid-template-columns:1fr auto; gap:26px; align-items:center}
+.heromark{width:104px; height:104px; margin-top:6px}
 .theme{
   font:inherit; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10px;
   letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2); cursor:pointer;
@@ -117,36 +126,29 @@ header{padding:40px 0 20px}
 }
 .theme:hover{color:var(--ink); border-color:var(--ink-3)}
 h1{
-  font-family:"Familjen Grotesk",ui-sans-serif,system-ui,sans-serif;
-  font-weight:700; font-size:clamp(30px,5.5vw,44px); line-height:1.05;
-  letter-spacing:-.02em; margin:14px 0 8px; text-wrap:balance;
+  font-family:"Zilla Slab",serif;
+  font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.05;
+  letter-spacing:-.015em; margin:14px 0 4px; text-wrap:balance;
 }
-.lede{color:var(--ink-2); max-width:62ch; margin:0}
 
-/* ---- machine picker: the page's one required decision ---- */
-.machine{
-  margin:24px 0 0; padding:18px; border-radius:12px;
-  background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow);
+/* ---- coverage strip: which data this is, in one line ---- */
+.strip{
+  margin:22px 0 0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  padding:10px 14px; box-shadow:var(--shadow); font-size:13.5px; color:var(--ink-2);
 }
-.machine h2{
-  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; font-weight:500;
+.striptag{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent-ink); background:var(--accent-soft);
+  border-radius:5px; padding:3px 8px; flex:none;
 }
-.pick{display:grid; grid-template-columns:1fr 1fr; gap:10px}
-.pick button{
-  font:inherit; text-align:left; cursor:pointer; padding:13px 15px;
-  background:var(--ground); color:var(--ink); border:1.5px solid var(--line-2);
-  border-radius:10px; display:flex; flex-direction:column; gap:3px;
+.striptag.pro{color:var(--ink-2); background:var(--raised)}
+.swap{
+  font:inherit; color:var(--accent-ink); background:none; border:0; padding:0;
+  cursor:pointer; text-decoration:underline; text-decoration-color:var(--accent);
 }
-.pick button:hover{border-color:var(--accent)}
-.pick button[aria-pressed="true"]{
-  border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink);
-}
-.pick .n{font-family:"Familjen Grotesk",sans-serif; font-weight:600; font-size:16px}
-.pick .d{font-size:12.5px; color:var(--ink-3); line-height:1.35}
-.pick button[aria-pressed="true"] .d{color:var(--accent-ink); opacity:.85}
-.machine .note{margin:12px 0 0; font-size:13.5px; color:var(--ink-2)}
-header .note{margin:14px 0 0; font-size:13.5px; color:var(--ink-2); max-width:60ch}
+.swap:hover{color:var(--accent)}
+.histref{margin:18px 2px 0; font-size:13.5px; color:var(--ink-3)}
 footer a{color:var(--ink-2)}
 
 /* ---- controls ---- */
@@ -248,27 +250,19 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   background:var(--surface); border:1px solid var(--line);
   border-radius:12px; padding:14px 16px; box-shadow:var(--shadow);
 }
-/* the machine's numbered selector, borrowed as the unit of the page */
-.dial{
-  flex:none; width:56px; height:56px; border-radius:50%;
-  display:grid; place-items:center; position:relative;
-  background:var(--dial-soft); border:2px solid var(--dial);
+/* the machine's numbered selector, borrowed as the unit of the page: the
+   needle fills the gap between core and ring at the setting's position */
+.dialsvg{flex:none; width:64px; height:64px}
+.dialsvg text{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+.rec.hasimg{grid-template-columns:auto 1fr auto}
+.thumb{
+  width:52px; height:52px; border-radius:10px; flex:none;
+  border:1.5px dashed var(--line-2); background:var(--ground); color:var(--ink-3);
+  display:flex; align-items:center; justify-content:center;
 }
-.dial span{
-  font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
-  font-weight:600; font-size:21px; color:var(--dial-ink); line-height:1;
-}
-/* the tick turns to the number's position, the way the wheel on the machine does */
-.dial::before{
-  content:""; position:absolute; inset:0; border-radius:50%;
-  background:linear-gradient(var(--dial),var(--dial)) 50% 3px/2px 8px no-repeat;
-  transform:rotate(var(--a,0deg));
-}
-.dial.stop{background:var(--stop-soft); border-color:var(--stop)}
-.dial.stop span{color:var(--stop-ink); font-size:24px}
-.dial.stop::before{content:none}
+.thumb svg{width:22px; height:22px}
 .name{
-  font-family:"Familjen Grotesk",sans-serif; font-weight:600; font-size:17px;
+  font-family:"Zilla Slab",serif; font-weight:600; font-size:17.5px;
   line-height:1.25; margin:0 0 3px; text-wrap:balance;
 }
 .name em{font-style:normal; background:var(--accent-soft); color:var(--accent-ink); border-radius:3px}
@@ -299,7 +293,7 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow);
 }
 .panel h2{
-  font-family:"Familjen Grotesk",sans-serif; font-weight:600; font-size:19px;
+  font-family:"Zilla Slab",serif; font-weight:600; font-size:19.5px;
   margin:0 0 6px; letter-spacing:-.01em;
 }
 .panel > p{margin:0 0 16px; color:var(--ink-2); max-width:62ch; font-size:14.5px}
@@ -314,8 +308,8 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   background:var(--accent-soft); color:var(--accent-ink); margin-top:1px;
 }
 .panel h3{
-  font-size:15px; margin:0 0 3px; font-weight:600;
-  font-family:"Familjen Grotesk",sans-serif;
+  font-size:15.5px; margin:0 0 3px; font-weight:600;
+  font-family:"Zilla Slab",serif;
 }
 .panel p{margin:0; font-size:14px; color:var(--ink-2)}
 .panel code{
@@ -350,41 +344,32 @@ footer{
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){
-  .pick{grid-template-columns:1fr}
   .rec{gap:13px; padding:12px 13px}
-  .dial{width:48px; height:48px}
-  .dial span{font-size:18px}
+  .dialsvg{width:52px; height:52px}
+  .thumb{width:44px; height:44px}
+  .heromark{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">
-    <span>Unofficial &mdash; not affiliated with Baby Brezza</span>
+  <div class="brandrow">
+    <span class="brand" aria-label="Formula Dial">formula d<span class="ti">&#305;<svg viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.3" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="1.7"></circle><line x1="7.5" y1="7.5" x2="7.5" y2="2.8" stroke="var(--needle)" stroke-width="1.7" stroke-linecap="round" transform="rotate(216 7.5 7.5)"></line></svg></span>al</span>
     <span class="rule" aria-hidden="true"></span>
     <button class="theme" id="theme" type="button"
             title="Switch between automatic, dark, and light"></button>
   </div>
-  <h1>What number does this tin need?</h1>
-  <p class="lede">Type the brand on the tin, get the setting &mdash; free, no email
-    address, no lookup limit. Covers the whole Formula Pro Advanced family (WiFi and
-    Mini included), the alternate numbers for lot-11 machines, and the discontinued
-    original Formula Pro their finder dropped. Searching happens in this tab; nothing
-    you type is sent anywhere.</p>
-  <p class="note"><strong>Check the number against your own tin before mixing a
-    bottle.</strong> These are the settings Baby Brezza publishes, findable without
-    the email gate &mdash; not independently verified numbers. And they change:
-    dates here mean "not touched since", never "verified on".</p>
+  <div class="eyebrow">Unofficial &mdash; not affiliated with Baby Brezza</div>
+  <div class="hgrid">
+    <h1>What number does this tin need?</h1>
+    <svg class="heromark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--dial)" stroke-width="2"></circle><g stroke="var(--dial)" stroke-width="2" stroke-linecap="round"><line x1="50" y1="10" x2="50" y2="16"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(36 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(72 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(108 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(144 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(180 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(252 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(288 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(324 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(216 50 50)"></line></g><circle cx="50" cy="50" r="26" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="2.8"></circle><line x1="50" y1="50" x2="50" y2="29" stroke="var(--needle)" stroke-width="3.2" stroke-linecap="round" transform="rotate(216 50 50)"></line><circle cx="50" cy="50" r="4" fill="var(--needle)"></circle></svg>
+  </div>
 </header>
 
-<section class="machine">
-  <h2>Which machine do you have?</h2>
-  <div class="pick" id="pick"></div>
-  <p class="note" id="machineNote"></p>
-</section>
+<section class="strip" id="strip"></section>
 
-<div class="controls" id="controls" hidden>
+<div class="controls" id="controls">
   <div class="searchrow">
     <div class="field">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -433,8 +418,8 @@ footer{
         <p>The setting exists to reproduce the mixing ratio printed on your formula's
         label, and it shifts with things you can see (brand, stage, country) and one
         you can't (your machine's lot number). The Advanced and the original Formula
-        Pro also mix differently &mdash; the machine picker at the top is not
-        decoration. If this page, the
+        Pro also mix differently &mdash; this page shows the Advanced family; the
+        discontinued original lives behind the link at the bottom. If this page, the
         <a href="https://babybrezza.com/pages/formula-pro-global-settings-finder">official
         finder</a>, and the tin disagree, believe none of them: ask Baby Brezza or
         your pediatrician. A result marked <em>no dial position</em> is Baby Brezza's
@@ -545,6 +530,8 @@ footer{
   is on-device too: camera frames are decoded in your browser and never uploaded.</p>
 </section>
 
+<p class="histref" id="histref"></p>
+
 <footer id="foot"></footer>
 </div>
 
@@ -571,8 +558,8 @@ const MODEL_KEY = ["advanced","pro"];
 const el = id => document.getElementById(id);
 const $q=el("q"), $terr=el("terr"), $out=el("out"), $count=el("count"),
       $empty=el("empty"), $mode=el("mode"), $chips=el("chips"),
-      $controls=el("controls"), $pick=el("pick"), $note=el("machineNote"),
-      $lot=el("lot"), $lotrow=el("lotrow"), $lotstate=el("lotstate");
+      $strip=el("strip"), $lot=el("lot"), $lotrow=el("lotrow"),
+      $lotstate=el("lotstate");
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtDate(iso){
@@ -615,37 +602,34 @@ $theme.addEventListener("click", () => {
   applyTheme(theme);
 });
 
-// --- machine picker
-$pick.innerHTML = MODEL_KEY.map(k => {
-  const m = D.M[k], c = m.counts;
-  return `<button type="button" data-model="${k}" aria-pressed="false">
-    <span class="n">${esc(m.label)}</span>
-    <span class="d">${c.records.toLocaleString()} settings · ${c.brands} brands${
-      k === "advanced" ? ` · also the WiFi and Mini · live data, newest ${fmtDate(c.newest)}`
-                       : " · discontinued FRP0045 · frozen since ~2022"}</span>
-  </button>`;
-}).join("");
+// --- coverage strip: which dataset is on screen. The Advanced is the line
+// still being sold, so it is the default; the original is a historical
+// reference reached from the line above the footer.
+function renderStrip(){
+  const a = D.M.advanced.counts, p = D.M.pro.counts;
+  $strip.innerHTML = model === "advanced"
+    ? `<span class="striptag">All Formula Pro Advanced</span>
+       <span>One settings set covers the Advanced, WiFi and Mini &middot; ${
+         a.records.toLocaleString()} settings &middot; live data, newest ${fmtDate(a.newest)}</span>`
+    : `<span class="striptag pro">Original Formula Pro &mdash; historical</span>
+       <span>${p.records.toLocaleString()} settings &middot; frozen since ~2022 &middot; a starting
+       point, not gospel &middot; <button class="swap" id="backadv" type="button">back to the
+       Advanced</button></span>`;
+  const b = el("backadv");
+  if (b) b.addEventListener("click", () => setModel("advanced"));
+}
 
-$pick.addEventListener("click", e => {
-  const b = e.target.closest("button[data-model]");
-  if (!b) return;
-  model = b.dataset.model;
-  store.set("brezza.model", model);
+function setModel(m){
+  model = m;
+  store.set("brezza.model", m);
   applyModel();
   run();
-  $q.focus();
-});
+  $strip.scrollIntoView({block:"nearest"});
+  $q.focus({preventScroll:true});
+}
 
 function applyModel(){
-  for (const b of $pick.querySelectorAll("button[data-model]"))
-    b.setAttribute("aria-pressed", String(b.dataset.model === model));
-  if (!model){
-    $note.textContent = "Pick one to search — the two machines take different numbers for the same tin.";
-    $controls.hidden = true;
-    return;
-  }
-  $controls.hidden = false;
-  $note.textContent = D.M[model].note;
+  renderStrip();
   // Only Advanced and Advanced WiFi take the lot-number branch; the Mini and
   // the original never do.
   $lotrow.hidden = model !== "advanced";
@@ -687,7 +671,7 @@ const isBarcode = s => digits(s).length >= 8 && digits(s).length === s.replace(/
 
 function search(){
   const raw = $q.value.trim();
-  if (!raw || !model) return {mode:"", hits:[]};
+  if (!raw) return {mode:"", hits:[]};
   const ti = D.T.indexOf($terr.value);
   const bit = ti >= 0 ? (1n << BigInt(ti)) : 0n;
   const mine = i => MODEL_KEY[D.R[i][0]] === model;
@@ -760,14 +744,37 @@ function countryLabel(mask){
 
 const MAX = 120;
 
+// The row dial is the featured mark with the number set into its core: outer
+// ring, ten ticks, and the needle filling the core-to-ring gap at the
+// setting's position — where it replaces that position's tick.
+function ticksSVG(skip){
+  let t = "";
+  for (let a = 0; a < 360; a += 36)
+    if (a !== skip) t += `<line x1="50" y1="10" x2="50" y2="16" transform="rotate(${a} 50 50)"/>`;
+  return t;
+}
+function dialSVG(n){
+  const a = (n % 10) * 36;
+  return `<svg class="dialsvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--dial)" stroke-width="2"/><g stroke="var(--dial)" stroke-width="2" stroke-linecap="round">${ticksSVG(a)}</g><circle cx="50" cy="50" r="26" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="2.8"/><line x1="50" y1="6.5" x2="50" y2="23" stroke="var(--needle)" stroke-width="4" stroke-linecap="round" transform="rotate(${a} 50 50)"/><text x="50" y="60" text-anchor="middle" font-size="30" font-weight="600" fill="var(--dial-ink)">${n}</text></svg>`;
+}
+// A published 0 (or a NOT COMPATIBLE row) is a dial face with no needle:
+// there is no position to point at.
+function stopSVG(setting){
+  const zero = setting === 0;
+  return `<svg class="dialsvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--stop)" stroke-width="2"/><g stroke="var(--stop)" stroke-width="2" stroke-linecap="round">${ticksSVG(-1)}</g><circle cx="50" cy="50" r="26" fill="var(--stop-soft)" stroke="var(--stop)" stroke-width="2.8"/><text x="50" y="${zero ? 60 : 61}" text-anchor="middle" font-size="${zero ? 30 : 34}" font-weight="600" fill="var(--stop-ink)">${zero ? "0" : "&times;"}</text></svg>`;
+}
+// The record's product image, once scraped and served from this site — until
+// then an honest placeholder. The original's backend never had images at all,
+// so its rows carry no slot.
+const THUMB = `<span class="thumb" aria-hidden="true" title="Product photo — coming once the images are scraped"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m5 19 5.5-6 3.5 4 2.5-3 2.5 3"/></svg></span>`;
+
 function run(){
   const raw = $q.value.trim();
   store.set("brezza.q", raw);
-  if (model) store.set("brezza.terr." + model, $terr.value);
+  store.set("brezza.terr." + model, $terr.value);
   const {mode, hits} = search();
   $mode.hidden = mode !== "barcode";
 
-  if (!model){ $count.textContent=""; $out.innerHTML=""; $empty.hidden=true; return }
   if (!raw){
     $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
     $empty.innerHTML = model === "pro"
@@ -813,10 +820,8 @@ function run(){
       : setting === 0
         ? `<span class="nope" title="Baby Brezza publishes a setting of 0 for this formula. The dial runs 1–10, so ask them before using it.">No dial position</span>`
         : `<span class="nope">${esc(setting)}</span>`;
-    return `<li class="rec">
-      <div class="dial${num ? "" : " stop"}"${
-        num ? ` style="--a:${(setting % 10) * 36}deg"` : ""} aria-hidden="true"><span>${
-        num ? setting : (setting === 0 ? "0" : "&times;")}</span></div>
+    return `<li class="rec${model === "advanced" ? " hasimg" : ""}">
+      ${num ? dialSVG(setting) : stopSVG(setting)}
       <div>
         <p class="name">${mark(D.B[r[1]] + " · " + r[2], terms)}</p>
         <div class="meta">
@@ -825,9 +830,17 @@ function run(){
           ${altChip}${was}${where}${upc}${fresh}
         </div>
       </div>
+      ${model === "advanced" ? THUMB : ""}
     </li>`;
   }).join("");
 }
+
+el("histref").innerHTML =
+  `Also here, as a historical reference: the discontinued ` +
+  `<button class="swap" id="showpro" type="button">original Formula Pro</button> &mdash; ` +
+  `${D.M.pro.counts.records.toLocaleString()} settings, frozen since ~2022, kept because ` +
+  `their finder dropped it. Treat those numbers as a starting point, not gospel.`;
+el("showpro").addEventListener("click", () => setModel("pro"));
 
 el("foot").innerHTML =
   `${D.M.advanced.counts.records.toLocaleString()} Formula Pro Advanced settings across ` +
@@ -985,7 +998,7 @@ $lot.value = store.get("brezza.lot","");
 applyModel();
 $q.value = store.get("brezza.q","");
 run();
-if (model) $q.focus({preventScroll:true});
+$q.focus({preventScroll:true});
 </script>
 """
 
