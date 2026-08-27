@@ -48,8 +48,7 @@ def alt_remaining():
     import crawl_alt
     data = json.load(open(SNAPSHOT))
     queries = {(r["territories"][0], r["brand"], r["type"], r["stage"])
-               for r in data["records"]
-               if r["model"] == "advanced" and r["territories"]}
+               for r in data["records"] if r["territories"]}
     return len(queries - crawl_alt.done_keys())
 
 

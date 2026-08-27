@@ -1,15 +1,24 @@
-"""Fold both crawls into one dataset.
+"""Fold each crawl into its own dataset.
 
-Two machines, two backends, two datasets:
+Two machines, two backends, two datasets -- and two files, because one is live
+and the other is frozen:
 
-  advanced  data/raw/settings.jsonl     -- the current API (crawlers/api.py), Formula Pro Advanced
-  pro       data/legacy/legacy_pro.jsonl   -- the retired backend (crawlers/legacy_api.py), original
-                                  Formula Pro (FRP0045)
+  data/raw/settings.jsonl       -- the current API (crawlers/api.py), the Formula
+                                   Pro Advanced line, still maintained
+                                   -> site/data/formula_settings.json
+  data/legacy/legacy_pro.jsonl  -- the retired backend (crawlers/legacy_api.py),
+                                   the original Formula Pro (FRP0045), frozen
+                                   -> site/data/legacy_formula_pro.json
+
+They are published apart so neither file carries the other's claim to freshness:
+the live snapshot is stamped `generated` and rebuilt monthly, the historical one
+records when it was crawled and is never regenerated.  Which machine a record
+belongs to is the file it is in, so no record carries a `model` field.
 
 The current API filters each record's `territory` array down to the territory
 you asked about, so the raw crawl holds one row per (territory, brand, type,
-stage).  Rows that agree on (model, brand, type, stage, setting) are merged here
-into a single record with a list of territories.  Rows that *disagree* on the
+stage).  Rows that agree on (brand, type, stage, setting) are merged here into
+a single record with a list of territories.  Rows that *disagree* on the
 setting stay separate -- that is the real regional-product case, and collapsing
 it would hand someone another region's number.
 
@@ -24,6 +33,11 @@ from crawlers.api import BASE, IMAGE_BASE
 from crawlers.legacy_api import BASE as LEGACY_BASE
 
 OUT = "site/data/formula_settings.json"
+LEGACY_OUT = "site/data/legacy_formula_pro.json"
+
+# The retired backend was walked once and versioned under data/legacy/; this is
+# the date of that crawl (`git log -- data/legacy/`), not of this build.
+LEGACY_CRAWLED = "2026-08-26"
 
 
 def norm_setting(v):
@@ -51,7 +65,7 @@ def load_advanced(path="data/raw/settings.jsonl"):
                 continue
             for terr in (rec.get("territory") or [row["query"][0]]):
                 rows.append({
-                    "model": "advanced", "brand": rec["brand"], "type": rec["type"],
+                    "brand": rec["brand"], "type": rec["type"],
                     "stage": rec["stage"] or "", "setting": norm_setting(rec["setting"]),
                     "territory": terr, "upc": rec.get("upc") or [],
                     "image": (rec.get("image") or [None])[0],
@@ -81,7 +95,7 @@ def load_pro(path="data/legacy/legacy_pro.jsonl"):
                         stats["blank_setting"] += 1
                         continue
                     rows.append({
-                        "model": "pro", "brand": r["brand"], "type": entry["type"],
+                        "brand": r["brand"], "type": entry["type"],
                         "stage": "" if stage.upper() in ("N/A", "") else stage,
                         "setting": s, "territory": r["territory"], "upc": [], "image": None,
                     })
@@ -92,17 +106,17 @@ def merge(rows):
     """Collapse identical answers across territories; keep disagreements apart."""
     groups = defaultdict(lambda: {"territories": set(), "upc": set(), "image": None})
     for r in rows:
-        key = (r["model"], r["brand"], r["type"], r["stage"], r["setting"])
+        key = (r["brand"], r["type"], r["stage"], r["setting"])
         g = groups[key]
         g["territories"].add(r["territory"])
         g["upc"].update(r["upc"])
         g["image"] = g["image"] or r["image"]
     out = []
-    for (model, brand, typ, stage, setting), g in groups.items():
-        out.append({"model": model, "brand": brand, "type": typ, "stage": stage,
+    for (brand, typ, stage, setting), g in groups.items():
+        out.append({"brand": brand, "type": typ, "stage": stage,
                     "setting": setting, "territories": sorted(g["territories"]),
                     "upc": sorted(g["upc"]), "image": g["image"]})
-    out.sort(key=lambda r: (r["model"], r["brand"].lower(), r["type"].lower(), r["stage"]))
+    out.sort(key=lambda r: (r["brand"].lower(), r["type"].lower(), r["stage"]))
     return out
 
 
@@ -131,7 +145,7 @@ def attach_alt(records, path="data/raw/alt_settings.jsonl"):
                 alt[(b, ty, st, t)] = norm_setting(r["alt"])
     n = 0
     for rec in records:
-        if rec["model"] != "advanced" or not rec["territories"]:
+        if not rec["territories"]:
             continue
         key = (rec["brand"], rec["type"], rec["stage"], rec["territories"][0])
         if key in alt:
@@ -166,20 +180,19 @@ def attach_dates(records, path="data/raw/image_dates.jsonl"):
     for rec in records:
         d = when.get(rec.get("image"))
         if d:
-            rec["updated"] = d
+            rec["image_date"] = d
             n += 1
     return n
 
 
 def find_conflicts(records):
-    """One (model, brand, type, stage, territory) answering with two settings."""
+    """One (brand, type, stage, territory) answering with two settings."""
     by_query = defaultdict(set)
     for r in records:
         for t in r["territories"]:
-            by_query[(r["model"], r["brand"], r["type"], r["stage"], t)].add(str(r["setting"]))
-    return [{"model": m, "brand": b, "type": ty, "stage": s, "territory": t,
-             "settings": sorted(v)}
-            for (m, b, ty, s, t), v in by_query.items() if len(v) > 1]
+            by_query[(r["brand"], r["type"], r["stage"], t)].add(str(r["setting"]))
+    return [{"brand": b, "type": ty, "stage": s, "territory": t, "settings": sorted(v)}
+            for (b, ty, s, t), v in by_query.items() if len(v) > 1]
 
 
 def main():
@@ -187,75 +200,94 @@ def main():
     pro_rows, pro_stats = load_pro()
     if not adv_rows and not pro_rows:
         sys.exit("no crawl output found -- run the crawlers first")
-    records = merge(adv_rows + pro_rows)
-    n_alt = attach_alt(records)
-    n_dated = attach_dates(records)
-    conflicts = find_conflicts(records)
+    advanced, pro = merge(adv_rows), merge(pro_rows)
+    n_alt = attach_alt(advanced)
+    n_dated = attach_dates(advanced)
+    adv_conflicts, pro_conflicts = find_conflicts(advanced), find_conflicts(pro)
 
-    def counts(model):
-        rs = [r for r in records if r["model"] == model]
-        return {
-            "records": len(rs),
-            "brands": len({r["brand"] for r in rs}),
-            "territories": len({t for r in rs for t in r["territories"]}),
-            "upcs": len({u for r in rs for u in r["upc"]}),
-            "not_compatible": sum(1 for r in rs if r["setting"] == "NOT COMPATIBLE"),
-            # The dial runs 1-10; a published 0 is not a position on it.
-            "zero": sum(1 for r in rs if r["setting"] == 0),
-            "alt": sum(1 for r in rs if "alt_setting" in r),
-            "dated": sum(1 for r in rs if "updated" in r),
-            "since_2026": sum(1 for r in rs if r.get("updated", "") >= "2026-01-01"),
-            "newest": max((r.get("updated", "") for r in rs), default="") or None,
-        }
-
-    model_counts = {m: counts(m) for m in ("advanced", "pro")}
-
-    data = {
+    live = {
         # Top-level provenance so a diff of the versioned snapshot is self-describing.
         "generated": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+        "label": "Formula Pro Advanced",
+        "note": "Covers Formula Pro Advanced, Advanced WiFi and Mini — "
+                "Baby Brezza's finder sends the identical query for all three. "
+                "Enter your lot number below if it starts with 11 — 99 formulas "
+                "have a second setting for those machines. The Mini never uses it.",
+        "source": BASE,
         "counts": {
-            **{m: c["records"] for m, c in model_counts.items()},
-            "records": len(records),
-            "conflicts": len(conflicts),
-            "with_alt_setting": n_alt,
+            "records": len(advanced),
+            "brands": len({r["brand"] for r in advanced}),
+            "territories": len({t for r in advanced for t in r["territories"]}),
+            "upcs": len({u for r in advanced for u in r["upc"]}),
+            "not_compatible": sum(1 for r in advanced if r["setting"] == "NOT COMPATIBLE"),
+            # The dial runs 1-10; a published 0 is not a position on it.
+            "zero": sum(1 for r in advanced if r["setting"] == 0),
+            "alt": n_alt,
             "dated": n_dated,
-        },
-        "models": {
-            "advanced": {
-                "label": "Formula Pro Advanced",
-                "note": "Covers Formula Pro Advanced, Advanced WiFi and Mini — "
-                        "Baby Brezza's finder sends the identical query for all three. "
-                        "Enter your lot number below if it starts with 11 — 99 formulas "
-                        "have a second setting for those machines. The Mini never uses it.",
-                "source": BASE,
-                "counts": model_counts["advanced"],
-            },
-            "pro": {
-                "label": "Formula Pro (original)",
-                "note": "Kept for the record. The discontinued FRP0045, served by a "
-                        "backend Baby Brezza retired — its data appears frozen since "
-                        "around 2022, and 27% of the settings in its Advanced copy have "
-                        "changed on the live one since. No barcodes, no lot-number "
-                        "variants. Treat these numbers as a starting point.",
-                "source": LEGACY_BASE,
-                "counts": model_counts["pro"],
-            },
+            "since_2026": sum(1 for r in advanced if r.get("image_date", "") >= "2026-01-01"),
+            "newest": max((r.get("image_date", "") for r in advanced), default="") or None,
+            "conflicts": len(adv_conflicts),
         },
         "image_base": IMAGE_BASE,
-        "crawl_stats": {"advanced": adv_stats, "pro": pro_stats},
-        "conflicts": conflicts,
-        "records": records,
+        "crawl_stats": dict(sorted(adv_stats.items())),
+        "conflicts": adv_conflicts,
+        "records": advanced,
     }
+
+    # No `generated` stamp here on purpose: this data has not moved since the
+    # backend serving it was retired, and re-dating it every monthly rebuild
+    # would claim a freshness it does not have.  What it can honestly carry is
+    # when we took the copy.
+    historical = {
+        "label": "Formula Pro (original)",
+        "note": "Kept for the record. The discontinued FRP0045, served by a "
+                "backend Baby Brezza retired — its data appears frozen since "
+                "around 2022, and 27% of the settings in its Advanced copy have "
+                "changed on the live one since. No barcodes, no lot-number "
+                "variants. Treat these numbers as a starting point.",
+        "source": LEGACY_BASE,
+        "provenance": {
+            "crawled": LEGACY_CRAWLED,
+            "upstream_frozen": "~2022",
+            "drift_estimate": "~27%: the same retired backend also holds a frozen copy "
+                              "of the Advanced line, which disagrees with the live API "
+                              "on 81 of 299 comparable entries (staleness.py -> "
+                              "data/staleness.json). An estimate of how far these "
+                              "numbers would have drifted, not a correction — there "
+                              "is nothing to check them against.",
+            "note": "Crawled once from the retired backend, versioned under "
+                    "data/legacy/ and never regenerated; nothing schedules it. "
+                    "See docs/HOW-IT-WORKS.md.",
+        },
+        "counts": {
+            "records": len(pro),
+            "brands": len({r["brand"] for r in pro}),
+            "territories": len({t for r in pro for t in r["territories"]}),
+            "not_compatible": sum(1 for r in pro if r["setting"] == "NOT COMPATIBLE"),
+            "conflicts": len(pro_conflicts),
+        },
+        "crawl_stats": dict(sorted(pro_stats.items())),
+        "conflicts": pro_conflicts,
+        "records": pro,
+    }
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-    for m, meta in data["models"].items():
-        print(f"{m:9s} {json.dumps(meta['counts'])}")
-    print("crawl_stats:", json.dumps(data["crawl_stats"]))
+    for path, doc in ((OUT, live), (LEGACY_OUT, historical)):
+        with open(path, "w") as f:
+            json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
+
+    print("advanced", json.dumps(live["counts"]))
+    print("original", json.dumps(historical["counts"]))
+    print("crawl_stats:", json.dumps({"advanced": live["crawl_stats"],
+                                      "original": historical["crawl_stats"]}))
     print(f"alternate (lot 11…) settings attached: {n_alt}")
     print(f"records dated from image Last-Modified: {n_dated}")
-    print(f"conflicts: {len(conflicts)}" + (f"  e.g. {conflicts[:2]}" if conflicts else ""))
-    print(f"wrote {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB)")
+    for name, cs in (("advanced", adv_conflicts), ("original", pro_conflicts)):
+        print(f"conflicts ({name}): {len(cs)}" + (f"  e.g. {cs[:2]}" if cs else ""))
+    print(f"wrote {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB) "
+          f"— live, generated {live['generated']}")
+    print(f"wrote {LEGACY_OUT} ({os.path.getsize(LEGACY_OUT)/1e6:.2f} MB) "
+          f"— frozen, crawled {LEGACY_CRAWLED}")
 
 
 if __name__ == "__main__":

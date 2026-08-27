@@ -137,12 +137,15 @@ jobs:
           python3 staleness.py > /dev/null 2>&1 || true
           # data/raw/ is untracked, so a CI checkout starts with no crawl output
           # at all; every loader in build_dataset.py treats a missing input as
-          # "no rows" rather than an error. Refuse to publish a snapshot that
-          # lost a whole model to that.
+          # "no rows" rather than an error. Refuse to publish either artifact
+          # collapsed to that (the legacy file builds from versioned inputs and
+          # should never trip this; checking it guards code bugs, not data/raw/).
           python3 - <<'PY'
           import json, sys
-          c = json.load(open("site/data/formula_settings.json"))["counts"]
-          bad = [k for k in ("advanced", "pro") if c.get(k, 0) < 1000]
+          files = {"advanced": "site/data/formula_settings.json",
+                   "pro": "site/data/legacy_formula_pro.json"}
+          c = {k: json.load(open(p))["counts"]["records"] for k, p in files.items()}
+          bad = [k for k, n in c.items() if n < 1000]
           if bad:
               sys.exit("refusing to publish: %s collapsed (%s)" % (", ".join(bad), c))
           print("sanity ok:", c)

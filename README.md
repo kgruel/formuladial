@@ -56,13 +56,15 @@ what is and isn't consent-gated — are in
 * **The discontinued original Formula Pro**, which Baby Brezza's finder no
   longer offers at all. Its numbers come from a retired backend and have
   drifted an estimated ~27% since it froze — treat them as a starting point,
-  not gospel. Details in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
+  not gospel. It ships as its own file, `site/data/legacy_formula_pro.json`,
+  kept out of the live snapshot so that frozen data never inherits a fresh
+  date. Details in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
 
 ## Command-line lookup
 
 If you have the repo checked out:
 
-    ./lookup.py similac 360                    # Advanced + original, tagged
+    ./lookup.py similac 360                    # the Advanced line — the default
     ./lookup.py similac 360 --lot 1123ABC      # numbers for a lot-11 Advanced
     ./lookup.py --upc 070074680644             # barcode (Advanced only)
     ./lookup.py --alt-only enfamil             # only formulas with an alternate
@@ -79,7 +81,7 @@ Run from the repo root:
     python3 build_dataset.py            # needed before the next two
     python3 crawlers/crawl_alt.py       #  lot-11 alternates -> data/raw/alt_settings.jsonl
     python3 crawlers/crawl_images.py    #  freshness dates   -> data/raw/image_dates.jsonl
-    python3 build_dataset.py            # -> site/data/formula_settings.json
+    python3 build_dataset.py            # -> both files under site/data/
     python3 build_page.py               # -> site/index.html
 
 Every crawler appends to a `.jsonl` under `data/raw/` and skips completed work
@@ -97,13 +99,18 @@ reconciles to zero gaps — is covered in
     data/legacy/    the original Formula Pro crawl — versioned, because that backend
                     is frozen and will never be crawled again
     docs/           HOW-IT-WORKS.md — the reverse-engineering notes
-    site/           what GitHub Pages serves: index.html and data/formula_settings.json
+    site/           what GitHub Pages serves: index.html, data/formula_settings.json
+                    and data/legacy_formula_pro.json
     .github/        the weekly watch and the monthly full crawl
 
-`site/data/formula_settings.json` is the versioned snapshot; it carries a
-top-level `generated` date and a `counts` summary so a diff says what changed.
-The two builders read only local files — no network — so the page can be rebuilt
-from an existing crawl at any time.
+`site/data/formula_settings.json` is the versioned snapshot of the live
+Advanced line; it carries a top-level `generated` date and a `counts` summary so
+a diff says what changed. The frozen original sits beside it in
+`site/data/legacy_formula_pro.json`, which deliberately carries no `generated`
+date — it records when it was *crawled* instead, because re-stamping frozen data
+every month would claim a freshness it does not have. The two builders read only
+local files — no network — so the page can be rebuilt from an existing crawl at
+any time.
 
 ## Keeping it fresh
 
@@ -114,8 +121,8 @@ run on a hunch. Two workflows, a cheap one and an expensive one:
 **`scripts/watch.py`**, weekly (`.github/workflows/watch.yml`). About 10,000
 requests, an hour and a half. It re-walks the catalogue's shape
 (territories → brands → types), HEADs every image the snapshot references for
-its `Last-Modified` and upload id, and re-queries ~30 popular formulas across
-the US, Germany, France, the UK and Canada — the lot-11 alternates included,
+its `Last-Modified`, and re-queries ~30 popular formulas across the US,
+Germany, France, the UK and Canada — the lot-11 alternates included,
 since those are the numbers known to move. It prints a JSON verdict and exits 0
 for *unchanged*, 1 for *changed*. On a change it opens (or comments on) an issue
 with the delta and dispatches the full crawl.

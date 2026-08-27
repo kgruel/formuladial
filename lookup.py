@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""Offline lookup for Baby Brezza powder settings, both machines.
+"""Offline lookup for Baby Brezza powder settings.
 
-    ./lookup.py similac 360              # both machines, each row tagged
-    ./lookup.py kendamil -m pro          # original Formula Pro only
+    ./lookup.py similac 360              # the Advanced line — the default
+    ./lookup.py kendamil -m pro          # the discontinued original, for the record
     ./lookup.py --upc 070074680644       # barcode (Advanced data only)
     ./lookup.py --brands -m pro -t Canada
     ./lookup.py similac --alt-only       # formulas with a lot-number variant
     ./lookup.py similac 360 --lot 11X    # numbers for a lot-11 Advanced
 
-Results are tagged ADVANCED or PRO because the two machines mix differently and
-the numbers are not interchangeable. Matching is case- and accent-insensitive;
-every space-separated term must appear in "brand type stage".
+Searches the Formula Pro Advanced line by default: the machine still sold and
+still maintained. The discontinued original Formula Pro is a separate, frozen
+file — `-m pro` reads it, `-m all` reads both. Results are tagged ADVANCED or
+PRO because the two machines mix differently and the numbers are not
+interchangeable. Matching is case- and accent-insensitive; every
+space-separated term must appear in "brand type stage".
 """
 import argparse, json, os, re, sys, unicodedata
 
-DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "site/data/formula_settings.json")
+ROOT = os.path.dirname(os.path.abspath(__file__))
+# One file per machine: the live Advanced snapshot, and the frozen original.
+DATA = {"advanced": os.path.join(ROOT, "site/data/formula_settings.json"),
+        "pro": os.path.join(ROOT, "site/data/legacy_formula_pro.json")}
 TAG = {"advanced": "ADVANCED", "pro": "PRO"}
 
 
@@ -24,11 +30,13 @@ def fold(s):
     return "".join(c for c in s if not unicodedata.combining(c)).casefold()
 
 
-def load():
-    if not os.path.exists(DATA):
-        sys.exit(f"{DATA} not found — run the crawlers then build_dataset.py")
-    with open(DATA) as f:
-        return json.load(f)
+def load(model):
+    """Records from one machine's file, tagged with the machine it is for."""
+    path = DATA[model]
+    if not os.path.exists(path):
+        sys.exit(f"{path} not found — run the crawlers then build_dataset.py")
+    with open(path) as f:
+        return [dict(r, model=model) for r in json.load(f)["records"]]
 
 
 def show(recs, territory_filter, lot=""):
@@ -66,8 +74,9 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("terms", nargs="*", help="words to match against brand/type/stage")
     p.add_argument("--upc", help="barcode on the tin (Formula Pro Advanced data only)")
-    p.add_argument("-m", "--model", choices=["pro", "advanced", "all"], default="all",
-                   help="which machine (default: both, each row tagged)")
+    p.add_argument("-m", "--model", choices=["pro", "advanced", "all"], default="advanced",
+                   help="which machine (default: advanced, the line still sold; "
+                        "pro is the discontinued original's historical record)")
     p.add_argument("-t", "--territory", help="restrict to a territory (substring)")
     p.add_argument("--brands", action="store_true", help="list brands instead of settings")
     p.add_argument("--lot", default="",
@@ -77,9 +86,9 @@ def main():
     p.add_argument("--json", action="store_true", help="raw JSON output")
     a = p.parse_args()
 
-    data = load()
     terr = fold(a.territory) if a.territory else None
-    recs = [r for r in data["records"] if a.model in ("all", r["model"])]
+    recs = [r for m in (["advanced", "pro"] if a.model == "all" else [a.model])
+            for r in load(m)]
     if a.alt_only:
         recs = [r for r in recs if "alt_setting" in r]
     if terr:

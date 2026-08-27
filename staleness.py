@@ -35,8 +35,7 @@ def setting_of(text):
 def main():
     live = defaultdict(set)
     for r in json.load(open("site/data/formula_settings.json"))["records"]:
-        if r["model"] == "advanced":
-            live[(norm(r["brand"]), norm(r["type"]), norm(r["stage"]))].add(r["setting"])
+        live[(norm(r["brand"]), norm(r["type"]), norm(r["stage"]))].add(r["setting"])
 
     frozen = defaultdict(set)
     try:

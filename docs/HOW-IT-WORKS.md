@@ -182,3 +182,9 @@ Bobbie but not ByHeart, Bubs or Kendamil, all of which reached US shelves in
 
 This set contains 110 **`NOT COMPATIBLE`** rows — formulas that machine cannot
 dispense at all. No barcodes, no lot-number variants, no dates.
+
+It is published as its own artifact, `site/data/legacy_formula_pro.json`, rather
+than inside the live snapshot: it records the date it was crawled and carries no
+`generated` stamp, because re-dating frozen data on every monthly rebuild would
+claim a freshness it does not have. The page still offers it, behind the
+historical-reference link below the results.

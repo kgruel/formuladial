@@ -44,7 +44,7 @@ def main():
     data = json.load(open("site/data/formula_settings.json"))
     queries = []
     for r in data["records"]:
-        if r["model"] != "advanced" or not r["territories"]:
+        if not r["territories"]:
             continue
         queries.append((r["territories"][0], r["brand"], r["type"], r["stage"]))
     queries = sorted(set(queries))

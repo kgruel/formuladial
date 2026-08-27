@@ -9,7 +9,7 @@ Scope: this dates the *image*, not the setting.  A record whose image was
 uploaded in 2023 may have had its number revised since without the picture
 changing.  It is an earliest-touched signal, not a last-verified one.
 """
-import json, os, threading
+import json, os, re, threading
 from concurrent.futures import ThreadPoolExecutor
 from email.utils import parsedate_to_datetime
 from api import IMAGE_BASE, head
@@ -49,9 +49,10 @@ def main():
             row["bytes"] = h.get("Content-Length")
         except Exception as e:
             row["error"] = str(e)[:120]
-        # leading number in "20467-<uuid>.png" looks like an upload sequence id
-        seq = img.split("-", 1)[0]
-        row["seq"] = int(seq) if seq.isdigit() else None
+        # leading number in "20467-<uuid>.png" looks like an upload sequence id;
+        # the separator varies -- "-", "_", or the extension on a bare "2181.jpg"
+        m = re.match(r"(\d+)[-_.]", img)
+        row["seq"] = int(m.group(1)) if m else None
         with lock:
             with open(OUT, "a") as f:
                 f.write(json.dumps(row) + "\n")

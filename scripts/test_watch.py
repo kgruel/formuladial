@@ -107,16 +107,6 @@ def main():
     d = verdict(o)
     check("image unreachable", d["changed"] and d["images"]["unreachable_total"] == 1)
 
-    # A brand-new upload id: the highest-numbered image answers under a bigger id.
-    o = copy.deepcopy(base_obs)
-    top = max(i for i in o["images"] if watch.seq_of(i) is not None)
-    hot = "999999-" + top.split("-", 1)[1]
-    o["images"][hot] = o["images"].pop(top)
-    d = verdict(o)
-    check("max upload id moved", d["changed"]
-          and d["images"]["max_seq_now"] == 999999
-          and d["images"]["max_seq_was"] != 999999)
-
     o = copy.deepcopy(base_obs)
     key = watch.skey(*watch.SENTINELS[0][:4])
     was = o["sentinels"][key]["false"]

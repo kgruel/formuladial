@@ -7,9 +7,8 @@ existing concurrency:
 
   * the shape of the catalogue: territories -> brands -> types (~6.5k GETs),
     diffed against `data/watch_baseline.json`;
-  * every image the snapshot references, HEADed for `Last-Modified` and the
-    upload-sequence id in its filename (~3.5k), diffed against the `updated`
-    dates already in the snapshot;
+  * every image the snapshot references, HEADed for `Last-Modified` (~3.5k),
+    diffed against the `image_date` values already in the snapshot;
   * a fixed set of ~30 popular formulas across US/EU/UK/CA (SENTINELS below),
     re-queried and compared to their published settings -- including the
     lot-11 alternates, which are the values documented to drift.
@@ -135,20 +134,13 @@ def expectations(snapshot):
     """Pull the image dates and sentinel settings the snapshot committed to."""
     images, settings = {}, {}
     for r in snapshot["records"]:
-        if r.get("model") != "advanced":
-            continue
         if r.get("image"):
-            images[r["image"]] = r.get("updated")
+            images[r["image"]] = r.get("image_date")
         for terr in r["territories"]:
             settings[skey(terr, r["brand"], r["type"], r["stage"])] = {
                 "setting": r["setting"], "alt_setting": r.get("alt_setting"),
             }
     return images, settings
-
-
-def seq_of(image):
-    lead = image.split("-", 1)[0]
-    return int(lead) if lead.isdigit() else None
 
 
 # --------------------------------------------------------------------------
@@ -266,25 +258,17 @@ def diff(baseline, expected_images, expected_settings, obs, cap=25):
 
     # Images: a moved Last-Modified means the picture was re-uploaded; a newly
     # unreachable one usually means the record behind it went away.
-    moved, gone, seqs = [], [], []
+    moved, gone = [], []
     for img, val in obs["images"].items():
         if isinstance(val, dict):
             gone.append({"image": img, "error": val.get("error")})
             continue
-        if val is not None:
-            s = seq_of(img)
-            if s is not None:
-                seqs.append(s)
         was = expected_images.get(img)
         if val != was:
             moved.append({"image": img, "was": was, "now": val})
-    base_seq = max([s for s in (seq_of(i) for i in expected_images) if s is not None],
-                   default=None)
-    live_seq = max(seqs, default=None)
     d["images"] = {
         "moved": moved[:cap], "moved_total": len(moved),
         "unreachable": gone[:cap], "unreachable_total": len(gone),
-        "max_seq_was": base_seq, "max_seq_now": live_seq,
     }
 
     for key, got in obs["sentinels"].items():
@@ -313,7 +297,6 @@ def diff(baseline, expected_images, expected_settings, obs, cap=25):
 
     d["changed"] = bool(d["territories"] or d["brands"] or d["types"]
                         or d["images"]["moved"] or d["images"]["unreachable"]
-                        or d["images"]["max_seq_now"] != d["images"]["max_seq_was"]
                         or d["sentinels"])
     return d
 
@@ -357,8 +340,6 @@ def summarize(d):
                  % (im["moved_total"], im["unreachable_total"]))
         for m in im["moved"][:8]:
             L.append("    - %s: %s -> %s" % (m["image"], m["was"], m["now"]))
-    if im["max_seq_now"] != im["max_seq_was"]:
-        L.append("- Max upload id: %s -> %s" % (im["max_seq_was"], im["max_seq_now"]))
     if d["sentinels"]:
         L.append("- Sentinels: %d disagree (of %d probed formulas)"
                  % (len(d["sentinels"]), len(SENTINELS)))

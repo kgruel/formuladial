@@ -1,5 +1,9 @@
 """Emit a single self-contained lookup page with both datasets embedded.
 
+The two datasets are published apart -- the live Advanced snapshot and the
+frozen original Formula Pro -- and joined back together here, because the page
+offers the original as a historical reference behind its own view.
+
 Territory membership is stored as a hex bitmask over the territory list, which
 is what keeps the payload small -- one record often covers dozens of countries.
 
@@ -7,20 +11,46 @@ The page makes you name your machine before it shows a number.  The two models
 mix differently and their numbers are not interchangeable, so a silent default
 would be the one bug that actually matters here.
 """
-import json, os
+import json, os, re
 
 from staleness import norm
 
 DATA = "site/data/formula_settings.json"
+LEGACY = "site/data/legacy_formula_pro.json"
 STALE = "data/staleness.json"
+THUMBS = "site/thumbs"
 OUT = "site/index.html"
 
 
-def pack(data):
-    recs = data["records"]
-    terrs = sorted({t for r in recs for t in r["territories"]})
+def thumb_stem(image):
+    """The committed thumbnail for `image`, or None if there is not one.
+
+    fetch_images.py cuts `site/thumbs/<stem>.webp` for every image it can
+    fetch, so what is on disk -- not what the record claims -- is the honest
+    source: a src pointing at a file the deploy does not carry would render as
+    a broken image.
+    """
+    if not image:
+        return None
+    stem = os.path.splitext(image)[0]
+    if not os.path.exists(os.path.join(THUMBS, stem + ".webp")):
+        return None
+    # the stem is interpolated straight into a src="" with no escaping
+    assert re.fullmatch(r"[A-Za-z0-9._-]+", stem), "unsafe thumb name: %s" % stem
+    return stem
+
+
+def pack(adv, pro):
+    """Fold the two published files into one payload.
+
+    The page shows both machines, so a row still needs to say which one it came
+    from (index 0) -- but that is a fact about this page's two views, not about
+    the data, which now carries the distinction as a file boundary.
+    """
+    recs = [(0, r) for r in adv["records"]] + [(1, r) for r in pro["records"]]
+    terrs = sorted({t for _, r in recs for t in r["territories"]})
     ti = {t: i for i, t in enumerate(terrs)}
-    brands = sorted({r["brand"] for r in recs})
+    brands = sorted({r["brand"] for _, r in recs})
     bi = {b: i for i, b in enumerate(brands)}
     # The 81 settings staleness.py caught changing between the frozen ~2022
     # copy and the live API. Its example keys are already norm()ed.
@@ -30,18 +60,19 @@ def pack(data):
     except FileNotFoundError:
         was = {}
     rows = []
-    for r in recs:
+    for m, r in recs:
         mask = 0
         for t in r["territories"]:
             mask |= 1 << ti[t]
         w = (was.get((norm(r["brand"]), norm(r["type"]), norm(r["stage"])))
-             if r["model"] == "advanced" else None)
-        rows.append([1 if r["model"] == "pro" else 0, bi[r["brand"]], r["type"],
+             if m == 0 else None)
+        rows.append([m, bi[r["brand"]], r["type"],
                      r["stage"], r["setting"], format(mask, "x"), r["upc"],
-                     r.get("alt_setting"), r.get("updated"), w])
+                     r.get("alt_setting"), r.get("image_date"), w,
+                     thumb_stem(r.get("image"))])
     return {"T": terrs, "B": brands, "R": rows,
-            "M": {k: {"label": v["label"], "counts": v["counts"]}
-                  for k, v in data["models"].items()}}
+            "M": {"advanced": {"label": adv["label"], "counts": adv["counts"]},
+                  "pro": {"label": pro["label"], "counts": pro["counts"]}}}
 
 
 TEMPLATE = r"""<meta charset="utf-8">
@@ -60,6 +91,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
 :root{
   color-scheme:light;
   --ground:#f2f0ec; --surface:#fffefc; --raised:#e9e6e0;
+  --thumb-bg:#fff;  /* deliberately the same in dark: photos keep a photo-white frame */
   --ink:#1c2329; --ink-2:#4c565e; --ink-3:#7b858d;
   --line:#dbd7d0; --line-2:#c9c4bb;
   --accent:#0f6d72; --accent-soft:#d9e8e7; --accent-ink:#0a4a4e;
@@ -255,12 +287,16 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
 .dialsvg{flex:none; width:64px; height:64px}
 .dialsvg text{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
 .rec.hasimg{grid-template-columns:auto 1fr auto}
+/* A frame around the product photo, not a crop of it: tins are tall, the odd
+   few are extra-tall, and 81 arrive with a transparent background. The frame
+   stays photo-white in both themes so those 81 read the same as the 3,441
+   with white baked in -- one presentation, not a bright majority and a dark
+   minority. */
 .thumb{
   width:52px; height:52px; border-radius:10px; flex:none;
-  border:1.5px dashed var(--line-2); background:var(--ground); color:var(--ink-3);
-  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line-2); background:var(--thumb-bg);
+  object-fit:contain; padding:3px;
 }
-.thumb svg{width:22px; height:22px}
 .name{
   font-family:"Zilla Slab",serif; font-weight:600; font-size:17.5px;
   line-height:1.25; margin:0 0 3px; text-wrap:balance;
@@ -763,11 +799,6 @@ function stopSVG(setting){
   const zero = setting === 0;
   return `<svg class="dialsvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--stop)" stroke-width="2"/><g stroke="var(--stop)" stroke-width="2" stroke-linecap="round">${ticksSVG(-1)}</g><circle cx="50" cy="50" r="26" fill="var(--stop-soft)" stroke="var(--stop)" stroke-width="2.8"/><text x="50" y="${zero ? 60 : 61}" text-anchor="middle" font-size="${zero ? 30 : 34}" font-weight="600" fill="var(--stop-ink)">${zero ? "0" : "&times;"}</text></svg>`;
 }
-// The record's product image, once scraped and served from this site — until
-// then an honest placeholder. The original's backend never had images at all,
-// so its rows carry no slot.
-const THUMB = `<span class="thumb" aria-hidden="true" title="Product photo — coming once the images are scraped"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m5 19 5.5-6 3.5 4 2.5-3 2.5 3"/></svg></span>`;
-
 function run(){
   const raw = $q.value.trim();
   store.set("brezza.q", raw);
@@ -816,11 +847,19 @@ function run(){
         : `<span class="alt" title="Formula Pro Advanced and Advanced WiFi units whose lot number starts with 11. The Mini and the original never use this.">Lot 11… → ${altSetting}</span>`;
     const fresh = r[8] ? `<span class="fresh" title="When Baby Brezza last replaced this record's product image — a 'not touched since' signal. The setting may have been revised since without the picture changing.">image dated ${fmtDate(r[8])}</span>` : "";
     const was = r[9] ? `<span class="was" title="This record's setting in a frozen copy of Baby Brezza's own data from around 2022 — evidence the number moves, not an official change log.">was <s>${esc(r[9])}</s></span>` : "";
+    // The product photo, cut to 128px and served from this site. Rows without
+    // one — records Baby Brezza never imaged, and every original-Pro row, whose
+    // backend had no images at all — get no box rather than an empty frame,
+    // which would promise a picture that is never coming. The alt is empty on
+    // purpose: the row's own text names the product, so the photo is decorative.
+    const thumb = r[10]
+      ? `<img class="thumb" src="thumbs/${r[10]}.webp" loading="lazy" decoding="async" alt="">`
+      : "";
     const nope = num ? `<span class="sr">Setting ${setting}</span>`
       : setting === 0
         ? `<span class="nope" title="Baby Brezza publishes a setting of 0 for this formula. The dial runs 1–10, so ask them before using it.">No dial position</span>`
         : `<span class="nope">${esc(setting)}</span>`;
-    return `<li class="rec${model === "advanced" ? " hasimg" : ""}">
+    return `<li class="rec${thumb ? " hasimg" : ""}">
       ${num ? dialSVG(setting) : stopSVG(setting)}
       <div>
         <p class="name">${mark(D.B[r[1]] + " · " + r[2], terms)}</p>
@@ -830,7 +869,7 @@ function run(){
           ${altChip}${was}${where}${upc}${fresh}
         </div>
       </div>
-      ${model === "advanced" ? THUMB : ""}
+      ${thumb}
     </li>`;
   }).join("");
 }
@@ -1004,8 +1043,7 @@ $q.focus({preventScroll:true});
 
 
 def main():
-    data = json.load(open(DATA))
-    packed = pack(data)
+    packed = pack(json.load(open(DATA)), json.load(open(LEGACY)))
     wanted = ["Enfamil", "Similac", "Kirkland", "Bobbie", "Kendamil", "HiPP", "Holle",
               "ByHeart", "Parent's Choice", "Good Start", "Gerber", "Earth's Best"]
     quick = [b for b in wanted if b in packed["B"]]
@@ -1016,9 +1054,13 @@ def main():
     with open(OUT, "w") as f:
         f.write(html)
     nwas = sum(1 for r in packed["R"] if r[9])
+    nadv = sum(1 for r in packed["R"] if r[0] == 0)
+    nthumb = sum(1 for r in packed["R"] if r[10])
     print(f"wrote {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB), "
-          f"{len(packed['R'])} records, {len(packed['B'])} brands, "
-          f"{nwas} rows carry a 'was' chip (staleness examples: 81)")
+          f"{nadv} live Advanced records + {len(packed['R']) - nadv} from the frozen "
+          f"original, {len(packed['B'])} brands, "
+          f"{nwas} rows carry a 'was' chip (staleness examples: 81), "
+          f"{nthumb} carry a product photo")
 
 
 if __name__ == "__main__":
