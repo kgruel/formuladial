@@ -354,6 +354,14 @@ class PageContractTests(unittest.TestCase):
         self.assertEqual((int.from_bytes(head[16:20], "big"),
                           int.from_bytes(head[20:24], "big")), (1200, 630))
 
+    def test_home_screen_icon_is_declared_and_sized(self):
+        self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png">', self.html)
+        with open(os.path.join(ROOT, "site", "apple-touch-icon.png"), "rb") as f:
+            head = f.read(24)
+        self.assertEqual(head[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual((int.from_bytes(head[16:20], "big"),
+                          int.from_bytes(head[20:24], "big")), (180, 180))
+
     def test_the_page_links_its_published_repository(self):
         self.assertNotIn("USER/REPO", self.html)
         self.assertIn('href="https://github.com/kgruel/formuladial"', self.html)

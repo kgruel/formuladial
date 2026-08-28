@@ -181,6 +181,7 @@ TEMPLATE = r"""<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Formula Dial &mdash; Baby Brezza powder settings</title>
 __SOCIAL_META__
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='41' fill='%23f6e6cd' stroke='%23c9821a' stroke-width='9'/><line x1='50' y1='50' x2='50' y2='17' stroke='%235a3a08' stroke-width='10' stroke-linecap='round' transform='rotate(216 50 50)'/><circle cx='50' cy='50' r='7' fill='%235a3a08'/></svg>">
 <script>
 /* Before first paint: a stored theme choice must not flash the other one. */

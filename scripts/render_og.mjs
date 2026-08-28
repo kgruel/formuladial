@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/** Render site/og.png, the 1200x630 social-unfurl card.
+/** Render site/og.png (1200x630 social-unfurl card) and
+ * site/apple-touch-icon.png (180x180 home-screen icon).
  *
  * Run manually when the card design changes -- og.png is a committed asset,
  * not a build_page.py output, because the page build is deterministic and
@@ -59,9 +60,24 @@ ${hero}
   <div class="machines">Formula Pro Advanced &middot; Advanced WiFi &middot; Mini</div>
 </div>`;
 
+// The home-screen icon reuses the favicon's dial at Apple's 180x180. iOS
+// composites its own corner rounding, so the ground color runs full-bleed.
+const iconHtml = `<!doctype html><meta charset="utf-8"><style>
+body{margin:0; width:180px; height:180px; background:#f2f0ec; display:grid; place-items:center}
+svg{width:164px; height:164px}
+</style>
+<svg viewBox="0 0 100 100">
+<circle cx="50" cy="50" r="41" fill="#f6e6cd" stroke="#c9821a" stroke-width="9"/>
+<line x1="50" y1="50" x2="50" y2="17" stroke="#5a3a08" stroke-width="10"
+  stroke-linecap="round" transform="rotate(216 50 50)"/>
+<circle cx="50" cy="50" r="7" fill="#5a3a08"/>
+</svg>`;
+
 const scratch = mkdtempSync(join(tmpdir(), "brezza-og-"));
 const cardPath = join(scratch, "card.html");
+const iconPath = join(scratch, "icon.html");
 writeFileSync(cardPath, html);
+writeFileSync(iconPath, iconHtml);
 
 const chromium = [process.env.CHROMIUM, "/opt/homebrew/bin/chromium",
   "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
@@ -116,9 +132,17 @@ async function main() {
   await send("Emulation.setDeviceMetricsOverride",
     { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1, mobile: false });
   await pause(400); // let the woff2 faces finish loading
-  const shot = await send("Page.captureScreenshot", { format: "png" });
-  writeFileSync(join(root, "site/og.png"), Buffer.from(shot.data, "base64"));
+  const card = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(join(root, "site/og.png"), Buffer.from(card.data, "base64"));
   console.log(`wrote site/og.png (${WIDTH}x${HEIGHT})`);
+
+  await send("Emulation.setDeviceMetricsOverride",
+    { width: 180, height: 180, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: pathToFileURL(iconPath).href });
+  await pause(400);
+  const icon = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(join(root, "site/apple-touch-icon.png"), Buffer.from(icon.data, "base64"));
+  console.log("wrote site/apple-touch-icon.png (180x180)");
   socket.close();
 }
 
