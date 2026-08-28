@@ -305,9 +305,8 @@ footer a{color:var(--ink-2)}
   margin-top:14px; padding:20px; background:var(--surface);
   border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
 }
-.lookuphead{display:flex; justify-content:space-between; align-items:start; gap:18px; margin-bottom:17px}
-.lookuphead h2{font-family:"Zilla Slab",serif;font-size:24px;line-height:1.1;margin:0 0 4px}
-.lookuphead p{margin:0;color:var(--ink-2);font-size:14px}
+.lookuphead{display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:15px}
+.lookuphead h2{font-family:"Zilla Slab",serif;font-size:24px;line-height:1.1;margin:0}
 .privacytag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:5px 9px;white-space:nowrap}
 .setupgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .step{position:relative;border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--ground);transition:border-color .15s,box-shadow .15s,background .15s}
@@ -320,6 +319,7 @@ footer a{color:var(--ink-2)}
 .step.done .stepnum::before{content:"✓"}.step.done .stepnum{font-size:0}.step.done .stepnum::before{font-size:12px}
 .steplabel{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
 .stepstatus{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.stephint{margin-top:7px}
 .machinechoices{display:grid;grid-template-columns:1.45fr .75fr;gap:7px}
 .machinechoice{font:inherit;text-align:left;color:var(--ink-2);background:var(--surface);border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;cursor:pointer;line-height:1.15}
 .machinechoice strong{display:block;color:var(--ink);font-size:14px;font-weight:600}
@@ -423,6 +423,22 @@ input::placeholder{color:var(--ink-3)}
   padding:5px 12px;box-shadow:0 1px 1px rgba(28,35,41,.04);transition:transform .12s,border-color .12s,background .12s;
 }
 .chip:hover{color:var(--ink);border-color:var(--accent);background:var(--surface);transform:translateY(-1px)}
+/* a pinned formula: the restore chip and its unpin half share one pill */
+.pin{display:flex}
+.pin .chip{border-radius:999px 0 0 999px; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pin .chip:hover{transform:none}
+.pinx{font:inherit; font-size:13px; line-height:1; color:var(--accent-ink); background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 50%,var(--line)); border-left:0;
+  border-radius:0 999px 999px 0; padding:0 9px; cursor:pointer}
+.pinx:hover{color:var(--stop-ink); background:var(--stop-soft); border-color:var(--stop)}
+.pinbtn{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--accent-ink); background:none;
+  border:1px dashed var(--line-2); border-radius:999px; padding:5px 10px;
+  cursor:pointer; margin-top:9px}
+.pinbtn:hover{border-color:var(--accent); background:var(--accent-soft)}
+.pinbtn.on{border-style:solid; border-color:var(--accent); background:var(--accent-soft)}
+.remember{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-3); cursor:pointer; flex:none}
+.remember input{width:auto; padding:0; margin:0; accent-color:var(--accent)}
 
 /* ---- results ---- */
 .count{
@@ -430,6 +446,8 @@ input::placeholder{color:var(--ink-3)}
   text-transform:uppercase; color:var(--ink-3); padding:16px 2px 8px;
   border-top:1px solid var(--line); margin-top:4px;
 }
+/* no results yet: an empty count would still paint its rule as a stray line */
+.count:empty{display:none}
 ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
 .rec{
   display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center;
@@ -554,18 +572,29 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   overflow-wrap:anywhere;
 }
 .panel a{color:var(--accent-ink); text-decoration-color:var(--accent)}
-.panel details{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
-.panel summary{
+/* one disclosure affordance for every collapsed block: native marker hidden,
+   a mono Show/Hide chip after the title */
+.editorial > summary,.check summary{cursor:pointer; list-style:none}
+.editorial > summary::-webkit-details-marker,.check summary::-webkit-details-marker{display:none}
+.editorial > summary::after,.check summary::after{content:"Show"; font-family:"IBM Plex Mono",monospace; font-weight:400; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); margin-left:8px}
+.editorial[open] > summary::after,.check[open] summary::after{content:"Hide"}
+.editorial > summary{font-family:"Zilla Slab",serif; font-weight:600; font-size:19.5px}
+.editorial[open] > summary{margin-bottom:8px}
+/* inline so the Show chip sits beside the title, not under it */
+.check summary h3{display:inline}
+.check[open] summary{display:block; margin-bottom:4px}
+/* the evidence appendix inside the editorial keeps its own quieter summary */
+.editorial details{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
+.editorial details summary{
   font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-2); cursor:pointer;
 }
-.panel summary:hover{color:var(--ink)}
-.panel details[open] summary{margin-bottom:12px}
-.editorial > summary{font-family:"Zilla Slab",serif; font-weight:600; font-size:19.5px; cursor:pointer; list-style:none}
-.editorial > summary::-webkit-details-marker{display:none}
-.editorial > summary::after{content:"Show"; font-family:"IBM Plex Mono",monospace; font-weight:400; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); margin-left:8px}
-.editorial[open] > summary{margin-bottom:8px}
-.editorial[open] > summary::after{content:"Hide"}
+.editorial details summary:hover{color:var(--ink)}
+.editorial details[open] summary{margin-bottom:12px}
+/* flow rhythm after a list or a collapsed block, instead of per-paragraph
+   inline margins */
+.editorial ol + p{margin-top:14px}
+.editorial details + p{margin-top:14px}
 .fields{
   display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;
 }
@@ -583,6 +612,7 @@ footer{
   margin-top:22px; padding-top:18px; border-top:1px solid var(--line);
   font-size:13px; color:var(--ink-3);
 }
+footer p{margin:10px 0 0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){
   .heromark{width:96px;height:96px;margin:12px 0 0}
@@ -610,7 +640,7 @@ footer{
     <div class="hcol">
       <h1>What setting does this formula need?</h1>
       <p class="lede">Every powder setting Baby Brezza publishes, searchable in your
-      browser &mdash; no email address, no lookup limit, and nothing you type leaves the tab.</p>
+      browser &mdash; no email address required, local to your device.</p>
     </div>
     __HERO_MARK__
   </div>
@@ -620,14 +650,12 @@ footer{
 
 <section class="controls" id="controls" aria-labelledby="lookup-title">
   <div class="lookuphead">
-    <div><h2 id="lookup-title">Find the right powder setting</h2>
-      <p>Choose the machine, market, and exact formula before relying on a number.</p></div>
+    <h2 id="lookup-title">Find the right powder setting</h2>
     <span class="privacytag">Private · on this device</span>
   </div>
   <div class="setupgrid">
     <div class="step" id="machine-step">
       <div class="stephead"><span class="stepnum">1</span><span class="steplabel">Choose your machine</span><span class="stepstatus" id="machine-status">Required</span></div>
-      <input id="machine" type="hidden">
       <div class="machinechoices" role="group" aria-label="Your Formula Pro machine">
         <button class="machinechoice" type="button" data-machine="advanced" aria-pressed="false"><strong>Advanced / WiFi</strong><span>Lot 11 may differ</span></button>
         <button class="machinechoice" type="button" data-machine="mini" aria-pressed="false"><strong>Mini</strong><span>Standard setting</span></button>
@@ -639,6 +667,7 @@ footer{
                  placeholder="sticker underneath" aria-label="Machine lot number">
         </div>
         <span class="lotstate" id="lotstate"></span>
+        <label class="remember"><input id="lotkeep" type="checkbox"> Remember on this device</label>
       </div>
     </div>
     <div class="step" id="market-step">
@@ -648,7 +677,7 @@ footer{
         <input id="terr" type="search" list="territories" autocomplete="off" spellcheck="false" placeholder="Search or choose a market…" aria-label="Market where the formula was bought">
         <datalist id="territories"></datalist>
       </div>
-      <div class="stepstatus" style="margin-top:7px">Leave blank only to explore all markets.</div>
+      <div class="stepstatus stephint">Leave blank only to explore all markets.</div>
     </div>
     <div class="step searchstep" id="search-step">
       <div class="stephead"><span class="stepnum">3</span><label class="steplabel" for="q">Find your exact formula</label><span class="stepstatus" id="search-status">Brand, formula name, or barcode</span></div>
@@ -667,6 +696,7 @@ footer{
           Scan
         </button>
       </div>
+      <div class="quickrow" id="pinrow" hidden><span class="quicklabel">Pinned</span><div class="chips" id="pinchips"></div></div>
       <div class="quickrow"><span class="quicklabel">Popular brands</span><div class="chips" id="chips"></div></div>
     </div>
   </div>
@@ -683,10 +713,10 @@ footer{
   these four things.</p>
   <ol>
     <li>
-      <div>
-        <h3>Match the label and the machine</h3>
-        <p>The machine uses this setting to dispense the amount of powder called for
-        by the formula label. The right number can depend on brand, product, stage,
+      <details class="check">
+        <summary><h3>Match the label and the machine</h3></summary>
+        <p>The setting controls how much powder the machine dispenses to match the
+        formula label, and the right number can depend on brand, product, stage,
         market, and your machine. Formula Pro Advanced, Advanced WiFi, and Mini share
         Baby Brezza's current settings data, but only Advanced and Advanced WiFi can
         use a lot-11 alternate. If this page, the
@@ -695,23 +725,23 @@ footer{
         Baby Brezza before using the machine. A result marked <em>no dial position</em>
         is Baby Brezza's published 0; because the dial runs 1&ndash;10, do not treat
         it as a usable setting.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Recheck when anything changes</h3>
+      <details class="check">
+        <summary><h3>Recheck when anything changes</h3></summary>
         <p>Baby Brezza can revise settings without publishing a change log. Compared
         with a frozen copy of its data from around 2022, <strong>59 of 276
         unambiguous settings had changed</strong>; Similac Advance moved from
         4&nbsp;to&nbsp;5 and Alimentum from 6&nbsp;to&nbsp;5. That historical copy
-        is not used for lookup results. It appears only as a struck-out <em>was</em>
+        is never used for lookup results; it appears only as a struck-out <em>was</em>
         note where it differs from the current number. Recheck whenever you change
         formula, buy a newly labeled container, or replace the machine.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Keep it clean, then verify the output</h3>
+      <details class="check">
+        <summary><h3>Keep it clean, then verify the output</h3></summary>
         <p>A correct setting cannot compensate for caked powder or a clogged funnel.
         Baby Brezza says to clean the mixing funnel after every fourth bottle, keep
         powder above the MIN line, and keep powder-contact parts completely dry. To
@@ -719,11 +749,11 @@ footer{
         <a href="https://babybrezza.com/blogs/news/how-we-test-the-formula-pro-to-ensure-it-dispenses-formula-accurately">plastic-wrap
         test</a> with a kitchen scale that reads to one-hundredth of a gram, then
         compare the dispensed powder with the weight specified on the formula label.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Take extra care with higher-risk infants</h3>
+      <details class="check">
+        <summary><h3>Take extra care with higher-risk infants</h3></summary>
         <p>Powdered formula is not sterile. The
         <a href="https://www.cdc.gov/cronobacter/prevention/index.html">CDC</a>
         identifies babies younger than 2 months, born prematurely, or with weakened
@@ -737,32 +767,30 @@ footer{
         <a href="https://www.healthychildren.org/English/ages-stages/baby/formula-feeding/Pages/how-to-safely-prepare-formula-with-water.aspx">AAP's
         preparation guide</a> also covers water, storage, and measuring exactly as
         directed on the label.</p>
-      </div>
+      </details>
     </li>
   </ol>
 </section>
 
 <details class="panel editorial">
   <summary>About this independent, private lookup</summary>
-  <p>Baby Brezza's finder will not show a setting until you enter an email address, and
-  each search there is logged &mdash; email, IP address, city, ZIP, and the formula
-  you looked up &mdash; whether or not you tick the consent box. The number itself
-  is supplied by a public settings API that does not require an email. This page
-  makes that same data searchable locally.</p>
-  <p>Every number comes from Baby Brezza's own settings API, collected by an
-  exhaustive crawl. __SOURCE_LINKS__</p>
+  <p>Baby Brezza's official finder asks for your email address before it shows a
+  setting, and logs each search. The settings themselves come from a public API
+  that asks for none of that, so this page makes the same data searchable on
+  your device instead.</p>
+  <p>Every number comes from that API, collected by an exhaustive crawl.
+  __SOURCE_LINKS__</p>
   <details>
     <summary>What the official finder sends</summary>
-    <p>The following behavior is visible in Baby Brezza's
-    <code>formula-settings.js</code>: a lookup can send data to three destinations,
-    and only one of them depends on marketing consent.</p>
+    <p>This behavior is visible in the finder's <code>formula-settings.js</code>:
+    a lookup can send data to three destinations, and only one of them depends
+    on marketing consent.</p>
     <ol>
       <li>
         <div>
           <h3>Every lookup is logged<span class="gate">no opt-in</span></h3>
           <p>POSTed to <code>babybrezzaserver.com/index.php/without_response/getsetting</code>
-          on each search. Not tied to the consent checkbox, and it fires whether or not
-          you tick anything:</p>
+          on every search, whether or not you tick the consent box:</p>
           <div class="fields">
             <span>email</span><span>ip_address</span><span>user_agent</span>
             <span>city</span><span>state_prov</span><span>zip</span><span>country</span>
@@ -775,29 +803,32 @@ footer{
         <div>
           <h3>Marketing lists<span class="gate">checkbox-gated</span></h3>
           <p>Your address goes to <code>optin.babybrezza.com/api/subscribe/listrak</code>
-          on the US site, or <code>/klaviyo</code> elsewhere &mdash; but only if you tick
-          "I agree to receive marketing emails". This request is consent-gated.</p>
+          on the US site, or <code>/klaviyo</code> elsewhere, only if you tick
+          "I agree to receive marketing emails".</p>
         </div>
       </li>
       <li>
         <div>
           <h3>Warranty registration<span class="gate">skippable</span></h3>
-          <p>Name and email are sent to
-          <code>portal.babybrezza.com/api/warranty/activate</code>. Registration is
-          optional and can be skipped without affecting the setting lookup.</p>
+          <p>Your name and email go to
+          <code>portal.babybrezza.com/api/warranty/activate</code>. Skipping
+          registration does not affect the lookup.</p>
         </div>
       </li>
     </ol>
-    <p style="margin-top:16px">The location fields aren't guessed from your address &mdash;
-    the page loads an IP-geolocation script that writes your city, region, ZIP and IP
-    into cookies, which the logger then reads back. Meanwhile the email itself is
-    checked by a regular expression in your browser; the settings API itself never
-    asks for it.</p>
+    <p>The location fields are not guessed from your address: the page loads an
+    IP-geolocation script that writes your city, region, ZIP, and IP into
+    cookies, which the logger reads back. The email is validated by a regular
+    expression in your browser; the settings API never asks for it.</p>
   </details>
-  <p style="margin-top:14px"><strong>This page uses no analytics or cookies and has
-  no lookup backend.</strong> Every setting is already inside the file your browser downloaded;
-  searching runs locally, and your lot number stays in this tab. The barcode scanner
-  is on-device too: camera frames are decoded in your browser and never uploaded.</p>
+  <p><strong>This page uses no analytics or cookies and has no lookup
+  backend.</strong> Every setting is already inside the file your browser
+  downloaded, so searching runs on your device, and camera frames from the
+  barcode scanner are decoded in your browser and never uploaded. Your lot
+  number stays in this tab unless you tick <em>remember on this device</em>,
+  and a pinned formula keeps only its name, stage, and market &mdash; never the
+  setting, which is looked up fresh on every visit. Both live in this browser
+  alone.</p>
   <p><strong>Historical note:</strong> the discontinued Original Formula Pro is not
   supported by this app. Its frozen crawl is retained only as a research archive;
   none of its values are loaded, searched, or shown here.</p>
@@ -835,9 +866,10 @@ const UHAY = U.map(r => fold(D.B[r[0]] + " " + r[1] + " " + r[2]));
 const UMASK = U.map(r => BigInt("0x" + r[3]));
 
 const el = id => document.getElementById(id);
-const $q=el("q"), $machine=el("machine"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
+const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
       $empty=el("empty"), $mode=el("mode"), $chips=el("chips"),
-      $strip=el("strip"), $lot=el("lot"), $lotrow=el("lotrow"),
+      $lot=el("lot"), $lotrow=el("lotrow"), $lotkeep=el("lotkeep"),
+      $pinrow=el("pinrow"), $pinchips=el("pinchips"),
       $lotstate=el("lotstate"), $machineStep=el("machine-step"),
       $marketStep=el("market-step"), $searchStep=el("search-step"),
       $machineStatus=el("machine-status"), $marketStatus=el("market-status"),
@@ -881,8 +913,9 @@ const tabStore = {
   get(k,d){ try{ return sessionStorage.getItem(k) ?? d }catch(e){ return d } },
   set(k,v){ try{ sessionStorage.setItem(k,v) }catch(e){} }
 };
-// Older builds persisted formula searches. Remove that legacy key once so an
-// upgrade also honors the current session-only privacy boundary.
+// Older builds persisted formula searches without asking. Remove that legacy
+// key once: searches stay session-only, and only an explicit pin or an
+// opted-in lot number persists.
 try{ localStorage.removeItem("brezza.q") }catch(e){}
 
 let machine = store.get("brezza.machine", "");
@@ -912,42 +945,14 @@ $theme.addEventListener("click", () => {
   applyTheme(theme);
 });
 
-function renderStrip(){
-  const c = D.M.counts;
-  const machineNote = machine === "advanced"
-    ? "Advanced / WiFi selected &middot; a few formulas need the machine's lot number before a setting."
-    : machine === "mini"
-      ? "Mini selected &middot; Mini always uses the standard setting; no lot number needed."
-      : "Choose your machine before looking up a setting.";
-  $strip.innerHTML = `<span class="striptag">Current data &middot; Advanced / WiFi / Mini</span>
-    <span>${machineNote} ${c.records.toLocaleString()} settings &middot; last checked against Baby Brezza’s data
-    ${fmtFullDate(D.M.observed || D.M.generated)}</span>`;
-}
-
 function applyMachine(){
-  renderStrip();
   // The current data is shared, but lot-11 alternates belong only to
   // Advanced and Advanced WiFi machines; Mini never takes this branch.
   $lotrow.hidden = machine !== "advanced";
   $scan.hidden = !machine || !canScan;
-  // Examples, not categories: step 3's own label already reads "Brand, formula
-  // name, or barcode", and the brand chips below the field name brands again.
-  // A literal barcode is the one thing nothing else on the page demonstrates,
-  // so the budget buys one brand plus real digits -- that is what teaches a
-  // parent they may type twelve digits into a search box at all. 165.2px into
-  // the 188px this field has at the 390px floor; it also clears 375px, though
-  // the floor stays 390 because the lot placeholder does not. The old copy
-  // needed 299.5px and was clipped mid-barcode on every phone.
-  $q.placeholder = "Similac or 070074680644";
-  const prev = store.get("brezza.terr", "");
-  $territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
-  $terr.value = D.T.includes(prev) ? prev : "";
   document.querySelectorAll("[data-machine]").forEach(button => {
     button.setAttribute("aria-pressed", String(button.dataset.machine === machine));
   });
-
-  $chips.innerHTML = QUICK.filter(b => D.B.includes(b))
-    .map(b => `<button class="chip" type="button">${esc(b)}</button>`).join("");
 }
 
 $chips.addEventListener("click", e => {
@@ -1158,10 +1163,13 @@ function resultCard(i, terms){
   // A history row names the standard setting outright ("Standard setting:
   // 4 → 5"), so it is withheld with the number itself, like the `was` chip.
   const history = undecided ? "" : historyMarkup(r);
+  // The pin persists on an explicit tap; identity only, never the number.
+  const pinned = pinnedIndex(i) >= 0;
+  const pinBtn = `<button class="pinbtn${pinned ? " on" : ""}" type="button" data-pinbtn="${i}">${pinned ? "Pinned — tap to remove" : "Pin for your next visit"}</button>`;
   return `<li class="rec result${undecided ? " asking" : ""}${thumb ? " hasimg" : ""}">
     <div class="resultdial"><span class="resultlabel">${undecided ? "Needs lot no." : "Your setting"}</span>${undecided ? askSVG() : num ? dialSVG(setting) : stopSVG(setting)}</div>
     <div><p class="name">${mark(label, terms)}</p>
-      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${otherChip}${was}${where}</div>${asklot}${observed}${history}
+      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${otherChip}${was}${where}</div>${asklot}${observed}${history}${pinBtn}
     </div>${thumb}</li>`;
 }
 
@@ -1215,7 +1223,7 @@ function run(){
   if (!machine){
     updateSteps(raw, null);
     $mode.hidden = true; $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
-    $empty.innerHTML = "<p>Start by choosing your machine. Lot numbers beginning with 11 can change settings on Advanced and Advanced WiFi machines; Mini uses the standard setting.</p>";
+    $empty.innerHTML = "<p>Start by choosing your machine.</p>";
     return;
   }
   const {mode, hits, unavailable} = search();
@@ -1225,8 +1233,9 @@ function run(){
   $mode.hidden = mode !== "barcode";
 
   if (!raw){
-    $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
-    $empty.innerHTML = "<p>Enter the brand or formula name on the container, or paste its barcode.</p>";
+    // No hint here: step 3's placeholder and status already instruct, and the
+    // amber `needs` highlight is pointing at them.
+    $count.textContent=""; $out.innerHTML=""; $empty.hidden=true;
     return;
   }
   if (!hits.length && !unavailable.length){
@@ -1286,12 +1295,19 @@ function run(){
   if (resultChanged) requestAnimationFrame(() => $out.firstElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"}));
 }
 
+// Coverage facts only. Which machine is selected already shows in step 1 and
+// the machine-status slot; restating it here said everything twice.
+el("strip").innerHTML =
+  `<span class="striptag">Current data &middot; Advanced / WiFi / Mini</span>
+   <span>${D.M.counts.records.toLocaleString()} settings &middot; last checked against Baby Brezza’s data
+   ${fmtFullDate(D.M.observed || D.M.generated)}</span>`;
+
 el("foot").innerHTML =
   `${D.M.counts.records.toLocaleString()} current settings for Formula Pro Advanced, Advanced WiFi, and Mini across ` +
   `${D.M.counts.territories} markets/territories. Source crawl observed ${fmtFullDate(D.M.observed || D.M.generated)}. ` +
   `${D.M.counts.alt} carry a lot-11 alternate for Advanced / WiFi machines and ` +
   `${D.M.counts.zero} answer with a 0 rather than a dial position. ` +
-  `<p style="margin-top:10px">Unofficial and not affiliated with Baby Brezza &mdash; ` +
+  `<p>Unofficial and not affiliated with Baby Brezza &mdash; ` +
   `built because a safety lookup should not require an email address. All settings ` +
   `come from Baby Brezza's public data. __FOOT_SOURCE_LINKS__</p>`;
 
@@ -1301,6 +1317,7 @@ function normalizeLot(){
   const raw = $lot.value.trim().toUpperCase();
   if ($lot.value !== raw) $lot.value = raw;
   tabStore.set("brezza.lot", raw);
+  if ($lotkeep.checked) store.set("brezza.lot", raw);
 }
 
 // The caption states what the field is doing right now. It cannot call the lot
@@ -1331,19 +1348,68 @@ function syncLot(blocking){
   }
 }
 
+// ---- opt-in persistence: pinned formulas and the remembered lot ----
+// A pin stores identity and market only -- brand, type, stage, market --
+// never a setting. Restoring replays the lookup through run() against the
+// data this visit downloaded, so a moved setting, a new lot gate, or a
+// removed record shows current truth instead of a saved answer.
+let pins = [];
+try{ pins = JSON.parse(store.get("brezza.pins","[]")).filter(p => p && p.b && p.t) }catch(e){}
+const savePins = () => store.set("brezza.pins", JSON.stringify(pins));
+const pinOf = i => { const r = D.R[i]; return {b:D.B[r[0]], t:r[1], s:r[2], m:market()} };
+const samePin = (a,b) => a.b===b.b && a.t===b.t && a.s===b.s && a.m===b.m;
+const pinnedIndex = i => pins.findIndex(p => samePin(p, pinOf(i)));
+// The record a pin names, preferring one sold in the pin's market; null when
+// the current dataset no longer carries it, in which case run() falls back to
+// whatever the replayed search honestly finds.
+function findPinned(p){
+  const ti = D.T.indexOf(p.m);
+  const bit = ti >= 0 ? (1n << BigInt(ti)) : 0n;
+  let fallback = null;
+  for (let i = 0; i < D.R.length; i++){
+    const r = D.R[i];
+    if (D.B[r[0]] !== p.b || r[1] !== p.t || r[2] !== p.s) continue;
+    if ((MASK[i] & bit) !== 0n) return i;
+    if (fallback == null) fallback = i;
+  }
+  return fallback;
+}
+function renderPins(){
+  $pinrow.hidden = !pins.length;
+  $pinchips.innerHTML = pins.map((p, n) =>
+    `<span class="pin"><button class="chip" type="button" data-pin="${n}">${esc(p.b)} · ${esc(p.t)}${p.s ? ` · ${esc(p.s)}` : ""}</button>` +
+    `<button class="pinx" type="button" data-unpin="${n}" aria-label="Unpin ${escAttr(p.b)} ${escAttr(p.t)}">&times;</button></span>`).join("");
+}
+$pinchips.addEventListener("click", e => {
+  const go = e.target.closest("[data-pin]");
+  if (go){
+    const p = pins[+go.dataset.pin];
+    $terr.value = p.m || "";
+    $q.value = `${p.b} ${p.t}`;
+    chosen = findPinned(p);
+    run();
+    return;
+  }
+  const x = e.target.closest("[data-unpin]");
+  if (x){ pins.splice(+x.dataset.unpin, 1); savePins(); renderPins(); run() }
+});
+
+// The lot is session-only unless this box is ticked; unticking sweeps the
+// kept copy in the same gesture.
+$lotkeep.addEventListener("change", () => {
+  if ($lotkeep.checked) store.set("brezza.lot", $lot.value.trim().toUpperCase());
+  else store.remove("brezza.lot");
+});
+
 $lot.addEventListener("input", run);
 document.querySelectorAll("[data-machine]").forEach(button => button.addEventListener("click", () => {
-  $machine.value = button.dataset.machine;
-  $machine.dispatchEvent(new Event("change", {bubbles:true}));
-}));
-$machine.addEventListener("change", () => {
-  machine = $machine.value;
+  machine = button.dataset.machine;
   chosen = null;
   store.set("brezza.machine", machine);
   applyMachine();
   run();
-  if (machine) $terr.focus({preventScroll:true});
-});
+  $terr.focus({preventScroll:true});
+}));
 
 // ---- barcode scanner ----
 // Native BarcodeDetector where it actually has a backend (Chromium); otherwise
@@ -1465,6 +1531,14 @@ $q.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer =
 $terr.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer = setTimeout(run, 90) });
 $terr.addEventListener("change", () => { chosen = null; run() });
 $out.addEventListener("click", e => {
+  const pinButton = e.target.closest("[data-pinbtn]");
+  if (pinButton){
+    const i = +pinButton.dataset.pinbtn;
+    const n = pinnedIndex(i);
+    if (n >= 0) pins.splice(n, 1); else pins.push(pinOf(i));
+    savePins(); renderPins(); run();
+    return;
+  }
   const preview = e.target.closest("[data-preview]");
   if (preview){
     $imageboximg.src = preview.dataset.preview;
@@ -1488,12 +1562,33 @@ $imageboxclose.addEventListener("click", () => $imagebox.close());
 $imagebox.addEventListener("click", e => {
   if (e.target === $imagebox) $imagebox.close();
 });
-$lot.value = tabStore.get("brezza.lot","");
-$machine.value = machine;
+// Examples, not categories: step 3's own label already reads "Brand, formula
+// name, or barcode", and the brand chips below the field name brands again.
+// A literal barcode is the one thing nothing else on the page demonstrates,
+// so the budget buys one brand plus real digits -- that is what teaches a
+// parent they may type twelve digits into a search box at all. 165.2px into
+// the 188px this field has at the 390px floor; it also clears 375px, though
+// the floor stays 390 because the lot placeholder does not. The old copy
+// needed 299.5px and was clipped mid-barcode on every phone.
+$q.placeholder = "Similac or 070074680644";
+$territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
+const prevTerr = store.get("brezza.terr", "");
+$terr.value = D.T.includes(prevTerr) ? prevTerr : "";
+$chips.innerHTML = QUICK.filter(b => D.B.includes(b))
+  .map(b => `<button class="chip" type="button">${esc(b)}</button>`).join("");
+renderPins();
+// A kept lot exists only if the owner ticked the box, so the ticked state on
+// return is simply whether a kept copy exists.
+const keptLot = store.get("brezza.lot", null);
+$lotkeep.checked = keptLot != null;
+$lot.value = keptLot != null ? keptLot : tabStore.get("brezza.lot","");
 applyMachine();
 $q.value = tabStore.get("brezza.q","");
 run();
-(machine ? (market() ? $q : $terr) : document.querySelector("[data-machine]"))?.focus({preventScroll:true});
+// A returning owner lands ready to type; a fresh visit gets no autofocus --
+// a programmatic focus ring on the first machine button read as a selection
+// that had not happened.
+if (machine) (market() ? $q : $terr).focus({preventScroll:true});
 </script>
 """
 

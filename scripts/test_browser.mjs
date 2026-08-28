@@ -83,6 +83,12 @@ async function main() {
       `node.value = ${JSON.stringify(value)}; node.dispatchEvent(new Event(${JSON.stringify(event)}, {bubbles:true})); })()`);
     await settle();
   };
+  // Selection happens the way an owner does it: a click on the visible
+  // machine button, not a synthetic value on some hidden control.
+  const chooseMachine = async value => {
+    await evaluate(`document.querySelector('[data-machine=${JSON.stringify(value)}]').click()`);
+    await settle();
+  };
 
   for (let tries = 0; tries < 40; tries += 1) {
     if (await evaluate("document.readyState === 'complete' && typeof run === 'function'")) break;
@@ -99,7 +105,7 @@ async function main() {
   assert.equal(await evaluate("document.getElementById('machine-step').classList.contains('needs')"), true);
   assert.equal(await evaluate("out.querySelectorAll('.dialsvg').length"), 0);
 
-  await setValue("machine", "mini");
+  await chooseMachine("mini");
   assert.equal(await evaluate("lotrow.hidden"), true, "Mini must never expose lot-11 input");
   assert.equal(await evaluate("getComputedStyle(lotrow).display"), "none",
     "Mini lot input must be visually absent, not only marked hidden");
@@ -197,7 +203,7 @@ async function main() {
 
   // The lot placeholder is authored copy, not a lot number: text-transform must
   // normalise what the owner types without uppercasing -- and clipping -- it.
-  await setValue("machine", "advanced");
+  await chooseMachine("advanced");
   assert.equal(await evaluate("lotrow.hidden"), false, "Advanced must expose the lot input");
   assert.equal(await evaluate("getComputedStyle(lot).textTransform"), "uppercase",
     "A typed lot number must still be normalised to uppercase");
@@ -320,7 +326,7 @@ async function main() {
   assert.deepEqual(await stepClasses("machine-step"), ["step", "done"]);
 
   // Mini never reads the lot, so it is never gated by one.
-  await setValue("machine", "mini");
+  await chooseMachine("mini");
   await setValue("terr", "United States of America");
   await setValue("q", "bobbie organic gentle", "input");
   assert.deepEqual(await dialNumbers(), ["5"],
@@ -330,7 +336,7 @@ async function main() {
 
   // two of the 99 alternates are 0: the gate must be able to land in the
   // existing red no-dial-position face, not only on a number.
-  await setValue("machine", "advanced");
+  await chooseMachine("advanced");
   await setValue("terr", "United States of America");
   await setValue("lot", "11ABCD", "input");
   await setValue("q", "enfagrow gentlease toddler", "input");
@@ -376,6 +382,67 @@ async function main() {
   assert.notEqual(await evaluate("getComputedStyle(q).outlineWidth"), "0px",
     "The forced-colors focus outline must have width");
   await send("Emulation.setEmulatedMedia", { features: [] });
+
+  // ---- opt-in persistence: pins and the remembered lot ----
+  // The stored shapes are the invariant: a pin is identity + market, never a
+  // setting; the lot lands in localStorage only while its box is ticked. The
+  // segment ends with storage swept clean, so the census below starts from
+  // the state its drives assume.
+  await chooseMachine("advanced");
+  await setValue("terr", "United States of America");
+  await setValue("lot", "1123ABC", "input");
+  await setValue("q", "bobbie organic gentle", "input");
+  assert.notEqual(await evaluate("out.querySelector('[data-pinbtn]')"), null,
+    "A resolved result offers the pin action");
+  await evaluate("out.querySelector('[data-pinbtn]').click()");
+  await settle();
+  assert.equal(await evaluate("document.getElementById('pinrow').hidden"), false,
+    "Pinning reveals the pinned-formula chips");
+  const storedPins = JSON.parse(await evaluate("localStorage.getItem('brezza.pins')"));
+  assert.equal(storedPins.length, 1);
+  assert.deepEqual(Object.keys(storedPins[0]).sort(), ["b", "m", "s", "t"],
+    "A pin stores identity and market only, never a setting");
+  assert.match(await evaluate("out.querySelector('.pinbtn').textContent"), /Pinned/);
+
+  // the lot may persist only after the owner opts in, and tracks the field
+  assert.equal(await evaluate("localStorage.getItem('brezza.lot')"), null,
+    "The lot must not persist before the owner opts in");
+  await evaluate("(() => { const k = document.getElementById('lotkeep'); " +
+    "k.checked = true; k.dispatchEvent(new Event('change', {bubbles:true})); })()");
+  await settle();
+  assert.equal(await evaluate("localStorage.getItem('brezza.lot')"), "1123ABC");
+
+  // a fresh load of the same document: the pin and the kept lot come back,
+  // and the chip replays the lookup through current data -- the lot-11
+  // alternate, not a number the pin could have saved.
+  await send("Page.navigate", { url: pathToFileURL(join(root, "site/index.html")).href });
+  for (let tries = 0; tries < 40; tries += 1) {
+    if (await evaluate("document.readyState === 'complete' && typeof run === 'function'")) break;
+    await pause(50);
+  }
+  await settle();
+  assert.equal(await evaluate("document.getElementById('lot').value"), "1123ABC",
+    "An opted-in lot is restored on return");
+  assert.equal(await evaluate("document.getElementById('lotkeep').checked"), true);
+  assert.equal(await evaluate("document.getElementById('pinrow').hidden"), false,
+    "Pinned chips are offered before any search on return");
+  await evaluate("q.value = ''; q.dispatchEvent(new Event('input', {bubbles:true}))");
+  await settle();
+  await evaluate("document.querySelector('#pinchips [data-pin]').click()");
+  await settle();
+  assert.deepEqual(await dialNumbers(), ["6"],
+    "A pin replays the lookup: the lot-11 alternate wins, not a saved number");
+
+  // sweep: unpin from the card, untick the box -- storage returns to empty
+  await evaluate("out.querySelector('[data-pinbtn]').click()");
+  await settle();
+  assert.equal(await evaluate("document.getElementById('pinrow').hidden"), true);
+  assert.equal(await evaluate("localStorage.getItem('brezza.pins')"), "[]");
+  await evaluate("(() => { const k = document.getElementById('lotkeep'); " +
+    "k.checked = false; k.dispatchEvent(new Event('change', {bubbles:true})); })()");
+  await settle();
+  assert.equal(await evaluate("localStorage.getItem('brezza.lot')"), null,
+    "Unticking sweeps the kept lot");
 
   // ---- the payload column census ---------------------------------------
   // This block must stay last: it navigates the shared CDP target to an
@@ -467,7 +534,7 @@ window.__census = __census;
     }
     assert.notEqual(await evaluate("out.innerHTML.length"), 0, `census drive rendered nothing: ${note}`);
   };
-  await setValue("machine", "advanced");
+  await chooseMachine("advanced");
   // Albania carries all three schemas: a territory-variant record with its own
   // photo, `was` rows, and an unavailable row with a barcode.
   // barcode over both lists: R.upc on plain rows, V.territories + V.upc on the

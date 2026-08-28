@@ -35,7 +35,8 @@ by a single regex in your browser.
 
 So this project pulled the whole dataset once and put it in a page that runs
 entirely in your browser. Searching sends nothing anywhere; your lot number
-never leaves the tab. The receipts — which requests fire, what they carry,
+never leaves your device, and persists only if you ask the page to remember
+it. The receipts — which requests fire, what they carry,
 what is and isn't consent-gated — are in
 [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
 

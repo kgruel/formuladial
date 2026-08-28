@@ -124,9 +124,8 @@ footer a{color:var(--ink-2)}
   margin-top:14px; padding:20px; background:var(--surface);
   border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
 }
-.lookuphead{display:flex; justify-content:space-between; align-items:start; gap:18px; margin-bottom:17px}
-.lookuphead h2{font-family:"Zilla Slab",serif;font-size:24px;line-height:1.1;margin:0 0 4px}
-.lookuphead p{margin:0;color:var(--ink-2);font-size:14px}
+.lookuphead{display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:15px}
+.lookuphead h2{font-family:"Zilla Slab",serif;font-size:24px;line-height:1.1;margin:0}
 .privacytag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:5px 9px;white-space:nowrap}
 .setupgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .step{position:relative;border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--ground);transition:border-color .15s,box-shadow .15s,background .15s}
@@ -139,6 +138,7 @@ footer a{color:var(--ink-2)}
 .step.done .stepnum::before{content:"✓"}.step.done .stepnum{font-size:0}.step.done .stepnum::before{font-size:12px}
 .steplabel{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
 .stepstatus{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.stephint{margin-top:7px}
 .machinechoices{display:grid;grid-template-columns:1.45fr .75fr;gap:7px}
 .machinechoice{font:inherit;text-align:left;color:var(--ink-2);background:var(--surface);border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;cursor:pointer;line-height:1.15}
 .machinechoice strong{display:block;color:var(--ink);font-size:14px;font-weight:600}
@@ -242,6 +242,22 @@ input::placeholder{color:var(--ink-3)}
   padding:5px 12px;box-shadow:0 1px 1px rgba(28,35,41,.04);transition:transform .12s,border-color .12s,background .12s;
 }
 .chip:hover{color:var(--ink);border-color:var(--accent);background:var(--surface);transform:translateY(-1px)}
+/* a pinned formula: the restore chip and its unpin half share one pill */
+.pin{display:flex}
+.pin .chip{border-radius:999px 0 0 999px; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pin .chip:hover{transform:none}
+.pinx{font:inherit; font-size:13px; line-height:1; color:var(--accent-ink); background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 50%,var(--line)); border-left:0;
+  border-radius:0 999px 999px 0; padding:0 9px; cursor:pointer}
+.pinx:hover{color:var(--stop-ink); background:var(--stop-soft); border-color:var(--stop)}
+.pinbtn{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--accent-ink); background:none;
+  border:1px dashed var(--line-2); border-radius:999px; padding:5px 10px;
+  cursor:pointer; margin-top:9px}
+.pinbtn:hover{border-color:var(--accent); background:var(--accent-soft)}
+.pinbtn.on{border-style:solid; border-color:var(--accent); background:var(--accent-soft)}
+.remember{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-3); cursor:pointer; flex:none}
+.remember input{width:auto; padding:0; margin:0; accent-color:var(--accent)}
 
 /* ---- results ---- */
 .count{
@@ -249,6 +265,8 @@ input::placeholder{color:var(--ink-3)}
   text-transform:uppercase; color:var(--ink-3); padding:16px 2px 8px;
   border-top:1px solid var(--line); margin-top:4px;
 }
+/* no results yet: an empty count would still paint its rule as a stray line */
+.count:empty{display:none}
 ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
 .rec{
   display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center;
@@ -373,18 +391,29 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   overflow-wrap:anywhere;
 }
 .panel a{color:var(--accent-ink); text-decoration-color:var(--accent)}
-.panel details{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
-.panel summary{
+/* one disclosure affordance for every collapsed block: native marker hidden,
+   a mono Show/Hide chip after the title */
+.editorial > summary,.check summary{cursor:pointer; list-style:none}
+.editorial > summary::-webkit-details-marker,.check summary::-webkit-details-marker{display:none}
+.editorial > summary::after,.check summary::after{content:"Show"; font-family:"IBM Plex Mono",monospace; font-weight:400; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); margin-left:8px}
+.editorial[open] > summary::after,.check[open] summary::after{content:"Hide"}
+.editorial > summary{font-family:"Zilla Slab",serif; font-weight:600; font-size:19.5px}
+.editorial[open] > summary{margin-bottom:8px}
+/* inline so the Show chip sits beside the title, not under it */
+.check summary h3{display:inline}
+.check[open] summary{display:block; margin-bottom:4px}
+/* the evidence appendix inside the editorial keeps its own quieter summary */
+.editorial details{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
+.editorial details summary{
   font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-2); cursor:pointer;
 }
-.panel summary:hover{color:var(--ink)}
-.panel details[open] summary{margin-bottom:12px}
-.editorial > summary{font-family:"Zilla Slab",serif; font-weight:600; font-size:19.5px; cursor:pointer; list-style:none}
-.editorial > summary::-webkit-details-marker{display:none}
-.editorial > summary::after{content:"Show"; font-family:"IBM Plex Mono",monospace; font-weight:400; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); margin-left:8px}
-.editorial[open] > summary{margin-bottom:8px}
-.editorial[open] > summary::after{content:"Hide"}
+.editorial details summary:hover{color:var(--ink)}
+.editorial details[open] summary{margin-bottom:12px}
+/* flow rhythm after a list or a collapsed block, instead of per-paragraph
+   inline margins */
+.editorial ol + p{margin-top:14px}
+.editorial details + p{margin-top:14px}
 .fields{
   display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;
 }
@@ -402,6 +431,7 @@ footer{
   margin-top:22px; padding-top:18px; border-top:1px solid var(--line);
   font-size:13px; color:var(--ink-3);
 }
+footer p{margin:10px 0 0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){
   .heromark{width:96px;height:96px;margin:12px 0 0}
@@ -429,7 +459,7 @@ footer{
     <div class="hcol">
       <h1>What setting does this formula need?</h1>
       <p class="lede">Every powder setting Baby Brezza publishes, searchable in your
-      browser &mdash; no email address, no lookup limit, and nothing you type leaves the tab.</p>
+      browser &mdash; no email address, no lookup limit, and nothing you type leaves your device.</p>
     </div>
     <svg class="heromark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--dial)" stroke-width="1.4" opacity=".35"/><path d="M62.3 33.0L75.9 14.4" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="1" data-records="1"/><path d="M70.0 43.5L91.8 36.4" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="2" data-records="8"/><path d="M70.5 54.7L89.5 59.1M70.4 55.2L90.1 60.1M70.2 55.6L90.7 61.3M70.1 56.0L91.3 62.4M70.0 56.5L91.8 63.6M69.8 56.9L90.7 64.2M69.7 57.4L89.6 64.8M69.5 57.8L88.4 65.4M69.3 58.2L87.3 65.9" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="3" data-records="188"/><path d="M65.5 64.2L79.8 77.4M65.4 64.3L79.7 77.7M65.2 64.4L79.6 78.0M65.1 64.5L79.5 78.3M65.0 64.7L79.4 78.6M64.9 64.8L79.3 78.9M64.8 64.9L79.1 79.2M64.7 65.0L79.0 79.5M64.6 65.1L78.9 79.8M64.5 65.2L78.8 80.1M64.4 65.3L78.6 80.4M64.3 65.4L78.5 80.7M64.2 65.5L78.4 81.0M64.1 65.6L78.2 81.3M64.0 65.7L78.1 81.6M63.9 65.8L78.0 81.8M63.7 65.9L77.8 82.1M63.6 66.0L77.7 82.4M63.5 66.1L77.5 82.7M63.4 66.2L77.4 83.0M63.3 66.3L77.2 83.3M63.2 66.4L77.0 83.6M63.1 66.4L76.9 83.9M62.9 66.5L76.7 84.2M62.8 66.6L76.6 84.5M62.7 66.7L76.4 84.7M62.6 66.8L76.2 85.0M62.5 66.9L76.0 85.3M62.3 67.0L75.9 85.6M62.2 67.1L75.5 85.7M62.1 67.2L75.2 85.8M62.0 67.2L74.9 85.8M61.9 67.3L74.6 85.9M61.7 67.4L74.2 86.0M61.6 67.5L73.9 86.0M61.5 67.6L73.6 86.1M61.4 67.7L73.3 86.2M61.2 67.7L72.9 86.2M61.1 67.8L72.6 86.3M61.0 67.9L72.3 86.3M60.9 68.0L72.0 86.4M60.7 68.1L71.6 86.4M60.6 68.1L71.3 86.5M60.5 68.2L71.0 86.5M60.3 68.3L70.7 86.6M60.2 68.4L70.4 86.6M60.1 68.4L70.0 86.6M59.9 68.5L69.7 86.7M59.8 68.6L69.4 86.7M59.7 68.6L69.1 86.7M59.6 68.7L68.8 86.7M59.4 68.8L68.4 86.8M59.3 68.8L68.1 86.8M59.2 68.9L67.8 86.8M59.0 69.0L67.5 86.8M58.9 69.0L67.2 86.8M58.7 69.1L66.9 86.8" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="4" data-records="1135"/><path d="M54.7 70.5L59.1 89.5M54.6 70.5L58.9 89.6M54.5 70.5L58.7 89.8M54.4 70.5L58.5 89.9M54.2 70.6L58.2 90.0M54.1 70.6L58.0 90.2M54.0 70.6L57.8 90.3M53.9 70.6L57.6 90.5M53.7 70.7L57.3 90.6M53.6 70.7L57.1 90.7M53.5 70.7L56.9 90.9M53.4 70.7L56.6 91.0M53.2 70.8L56.4 91.1M53.1 70.8L56.2 91.3M53.0 70.8L55.9 91.4M52.9 70.8L55.7 91.5M52.7 70.8L55.4 91.6M52.6 70.8L55.2 91.8M52.5 70.9L55.0 91.9M52.3 70.9L54.7 92.0M52.2 70.9L54.5 92.1M52.1 70.9L54.2 92.2M52.0 70.9L54.0 92.4M51.8 70.9L53.7 92.5M51.7 70.9L53.5 92.6M51.6 70.9L53.2 92.7M51.5 70.9L53.0 92.8M51.3 71.0L52.7 92.9M51.2 71.0L52.5 93.0M51.1 71.0L52.2 93.1M51.0 71.0L52.0 93.3M50.8 71.0L51.7 93.4M50.7 71.0L51.4 93.5M50.6 71.0L51.2 93.6M50.4 71.0L50.9 93.7M50.3 71.0L50.7 93.8M50.2 71.0L50.4 93.9M50.1 71.0L50.1 94.0M49.9 71.0L49.9 94.0M49.8 71.0L49.6 93.9M49.7 71.0L49.3 93.8M49.6 71.0L49.1 93.7M49.4 71.0L48.8 93.6M49.3 71.0L48.6 93.5M49.2 71.0L48.3 93.4M49.0 71.0L48.0 93.3M48.9 71.0L47.8 93.1M48.8 71.0L47.5 93.0M48.7 71.0L47.3 92.9M48.5 70.9L47.0 92.8M48.4 70.9L46.8 92.7M48.3 70.9L46.5 92.6M48.2 70.9L46.3 92.5M48.0 70.9L46.0 92.4M47.9 70.9L45.8 92.2M47.8 70.9L45.5 92.1M47.7 70.9L45.3 92.0M47.5 70.9L45.0 91.9M47.4 70.8L44.8 91.8M47.3 70.8L44.6 91.6M47.1 70.8L44.3 91.5M47.0 70.8L44.1 91.4M46.9 70.8L43.8 91.3M46.8 70.8L43.6 91.1M46.6 70.7L43.4 91.0M46.5 70.7L43.1 90.9M46.4 70.7L42.9 90.7M46.3 70.7L42.7 90.6M46.1 70.6L42.4 90.5M46.0 70.6L42.2 90.3M45.9 70.6L42.0 90.2M45.8 70.6L41.8 90.0M45.6 70.5L41.5 89.9M45.5 70.5L41.3 89.8M45.4 70.5L41.1 89.6M45.3 70.5L40.9 89.5" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="5" data-records="1526"/><path d="M40.5 68.7L31.6 86.1M40.3 68.6L31.1 86.1M40.1 68.5L30.7 86.1M39.9 68.4L30.2 86.1M39.7 68.3L29.8 86.1M39.5 68.2L29.3 86.1M39.4 68.1L28.8 86.1M39.2 68.0L28.4 86.0M39.0 67.9L27.9 86.0M38.8 67.8L27.4 86.0M38.7 67.7L27.0 85.9M38.5 67.6L26.5 85.9M38.3 67.5L26.0 85.9M38.2 67.3L25.6 85.8M38.0 67.2L25.1 85.7M37.8 67.1L24.6 85.7M37.7 67.0L24.1 85.6M37.5 66.9L23.9 85.2M37.3 66.7L23.7 84.7M37.2 66.6L23.5 84.3M37.0 66.5L23.3 83.9M36.8 66.4L23.1 83.4M36.7 66.2L22.9 83.0M36.5 66.1L22.7 82.6M36.4 66.0L22.6 82.1M36.2 65.8L22.4 81.7M36.1 65.7L22.2 81.3M35.9 65.6L22.1 80.8M35.8 65.4L21.9 80.4M35.6 65.3L21.8 80.0M35.5 65.1L21.6 79.5M35.3 65.0L21.5 79.1M35.2 64.9L21.4 78.7" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="6" data-records="666"/><path d="M30.6 58.1L12.7 65.7M30.5 57.7L11.4 65.2M30.3 57.2L10.1 64.6M30.1 56.7L8.8 63.9M30.0 56.2L8.5 62.9M29.8 55.8L9.1 61.7M29.7 55.3L9.8 60.4M29.6 54.8L10.6 59.2" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="7" data-records="167"/><path d="M29.7 44.8L10.8 39.9M29.9 43.9L9.0 37.6M30.2 43.1L9.5 35.9M30.5 42.3L12.3 35.1" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="8" data-records="87"/><path d="M37.0 33.5L24.9 18.2M38.3 32.5L27.5 16.3" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="9" data-records="32"/><path d="M50.0 29.0L50.0 6.0" stroke="var(--dial)" stroke-width="1.15" stroke-linecap="round" opacity=".62" fill="none" data-setting="10" data-records="14"/><circle cx="50" cy="50" r="17" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="2.6"/><line x1="50.0" y1="68.0" x2="50.0" y2="92.4" stroke="var(--needle)" stroke-width="4.4" stroke-linecap="round"/><circle cx="50" cy="50" r="4" fill="var(--needle)"/></svg>
   </div>
@@ -439,14 +469,12 @@ footer{
 
 <section class="controls" id="controls" aria-labelledby="lookup-title">
   <div class="lookuphead">
-    <div><h2 id="lookup-title">Find the right powder setting</h2>
-      <p>Choose the machine, market, and exact formula before relying on a number.</p></div>
+    <h2 id="lookup-title">Find the right powder setting</h2>
     <span class="privacytag">Private · on this device</span>
   </div>
   <div class="setupgrid">
     <div class="step" id="machine-step">
       <div class="stephead"><span class="stepnum">1</span><span class="steplabel">Choose your machine</span><span class="stepstatus" id="machine-status">Required</span></div>
-      <input id="machine" type="hidden">
       <div class="machinechoices" role="group" aria-label="Your Formula Pro machine">
         <button class="machinechoice" type="button" data-machine="advanced" aria-pressed="false"><strong>Advanced / WiFi</strong><span>Lot 11 may differ</span></button>
         <button class="machinechoice" type="button" data-machine="mini" aria-pressed="false"><strong>Mini</strong><span>Standard setting</span></button>
@@ -458,6 +486,7 @@ footer{
                  placeholder="sticker underneath" aria-label="Machine lot number">
         </div>
         <span class="lotstate" id="lotstate"></span>
+        <label class="remember"><input id="lotkeep" type="checkbox"> Remember on this device</label>
       </div>
     </div>
     <div class="step" id="market-step">
@@ -467,7 +496,7 @@ footer{
         <input id="terr" type="search" list="territories" autocomplete="off" spellcheck="false" placeholder="Search or choose a market…" aria-label="Market where the formula was bought">
         <datalist id="territories"></datalist>
       </div>
-      <div class="stepstatus" style="margin-top:7px">Leave blank only to explore all markets.</div>
+      <div class="stepstatus stephint">Leave blank only to explore all markets.</div>
     </div>
     <div class="step searchstep" id="search-step">
       <div class="stephead"><span class="stepnum">3</span><label class="steplabel" for="q">Find your exact formula</label><span class="stepstatus" id="search-status">Brand, formula name, or barcode</span></div>
@@ -486,6 +515,7 @@ footer{
           Scan
         </button>
       </div>
+      <div class="quickrow" id="pinrow" hidden><span class="quicklabel">Pinned</span><div class="chips" id="pinchips"></div></div>
       <div class="quickrow"><span class="quicklabel">Popular brands</span><div class="chips" id="chips"></div></div>
     </div>
   </div>
@@ -502,10 +532,10 @@ footer{
   these four things.</p>
   <ol>
     <li>
-      <div>
-        <h3>Match the label and the machine</h3>
-        <p>The machine uses this setting to dispense the amount of powder called for
-        by the formula label. The right number can depend on brand, product, stage,
+      <details class="check">
+        <summary><h3>Match the label and the machine</h3></summary>
+        <p>The setting controls how much powder the machine dispenses to match the
+        formula label, and the right number can depend on brand, product, stage,
         market, and your machine. Formula Pro Advanced, Advanced WiFi, and Mini share
         Baby Brezza's current settings data, but only Advanced and Advanced WiFi can
         use a lot-11 alternate. If this page, the
@@ -514,23 +544,23 @@ footer{
         Baby Brezza before using the machine. A result marked <em>no dial position</em>
         is Baby Brezza's published 0; because the dial runs 1&ndash;10, do not treat
         it as a usable setting.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Recheck when anything changes</h3>
+      <details class="check">
+        <summary><h3>Recheck when anything changes</h3></summary>
         <p>Baby Brezza can revise settings without publishing a change log. Compared
         with a frozen copy of its data from around 2022, <strong>59 of 276
         unambiguous settings had changed</strong>; Similac Advance moved from
         4&nbsp;to&nbsp;5 and Alimentum from 6&nbsp;to&nbsp;5. That historical copy
-        is not used for lookup results. It appears only as a struck-out <em>was</em>
+        is never used for lookup results; it appears only as a struck-out <em>was</em>
         note where it differs from the current number. Recheck whenever you change
         formula, buy a newly labeled container, or replace the machine.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Keep it clean, then verify the output</h3>
+      <details class="check">
+        <summary><h3>Keep it clean, then verify the output</h3></summary>
         <p>A correct setting cannot compensate for caked powder or a clogged funnel.
         Baby Brezza says to clean the mixing funnel after every fourth bottle, keep
         powder above the MIN line, and keep powder-contact parts completely dry. To
@@ -538,11 +568,11 @@ footer{
         <a href="https://babybrezza.com/blogs/news/how-we-test-the-formula-pro-to-ensure-it-dispenses-formula-accurately">plastic-wrap
         test</a> with a kitchen scale that reads to one-hundredth of a gram, then
         compare the dispensed powder with the weight specified on the formula label.</p>
-      </div>
+      </details>
     </li>
     <li>
-      <div>
-        <h3>Take extra care with higher-risk infants</h3>
+      <details class="check">
+        <summary><h3>Take extra care with higher-risk infants</h3></summary>
         <p>Powdered formula is not sterile. The
         <a href="https://www.cdc.gov/cronobacter/prevention/index.html">CDC</a>
         identifies babies younger than 2 months, born prematurely, or with weakened
@@ -556,32 +586,30 @@ footer{
         <a href="https://www.healthychildren.org/English/ages-stages/baby/formula-feeding/Pages/how-to-safely-prepare-formula-with-water.aspx">AAP's
         preparation guide</a> also covers water, storage, and measuring exactly as
         directed on the label.</p>
-      </div>
+      </details>
     </li>
   </ol>
 </section>
 
 <details class="panel editorial">
   <summary>About this independent, private lookup</summary>
-  <p>Baby Brezza's finder will not show a setting until you enter an email address, and
-  each search there is logged &mdash; email, IP address, city, ZIP, and the formula
-  you looked up &mdash; whether or not you tick the consent box. The number itself
-  is supplied by a public settings API that does not require an email. This page
-  makes that same data searchable locally.</p>
-  <p>Every number comes from Baby Brezza's own settings API, collected by an
-  exhaustive crawl. <a href="data/formula_settings.json" download>Download the current dataset</a>. Found a setting that disagrees with your label? Confirm it with Baby Brezza.</p>
+  <p>Baby Brezza's official finder asks for your email address before it shows a
+  setting, and logs each search. The settings themselves come from a public API
+  that asks for none of that, so this page makes the same data searchable on
+  your device instead.</p>
+  <p>Every number comes from that API, collected by an exhaustive crawl.
+  <a href="data/formula_settings.json" download>Download the current dataset</a>. Found a setting that disagrees with your label? Confirm it with Baby Brezza.</p>
   <details>
     <summary>What the official finder sends</summary>
-    <p>The following behavior is visible in Baby Brezza's
-    <code>formula-settings.js</code>: a lookup can send data to three destinations,
-    and only one of them depends on marketing consent.</p>
+    <p>This behavior is visible in the finder's <code>formula-settings.js</code>:
+    a lookup can send data to three destinations, and only one of them depends
+    on marketing consent.</p>
     <ol>
       <li>
         <div>
           <h3>Every lookup is logged<span class="gate">no opt-in</span></h3>
           <p>POSTed to <code>babybrezzaserver.com/index.php/without_response/getsetting</code>
-          on each search. Not tied to the consent checkbox, and it fires whether or not
-          you tick anything:</p>
+          on every search, whether or not you tick the consent box:</p>
           <div class="fields">
             <span>email</span><span>ip_address</span><span>user_agent</span>
             <span>city</span><span>state_prov</span><span>zip</span><span>country</span>
@@ -594,29 +622,32 @@ footer{
         <div>
           <h3>Marketing lists<span class="gate">checkbox-gated</span></h3>
           <p>Your address goes to <code>optin.babybrezza.com/api/subscribe/listrak</code>
-          on the US site, or <code>/klaviyo</code> elsewhere &mdash; but only if you tick
-          "I agree to receive marketing emails". This request is consent-gated.</p>
+          on the US site, or <code>/klaviyo</code> elsewhere, only if you tick
+          "I agree to receive marketing emails".</p>
         </div>
       </li>
       <li>
         <div>
           <h3>Warranty registration<span class="gate">skippable</span></h3>
-          <p>Name and email are sent to
-          <code>portal.babybrezza.com/api/warranty/activate</code>. Registration is
-          optional and can be skipped without affecting the setting lookup.</p>
+          <p>Your name and email go to
+          <code>portal.babybrezza.com/api/warranty/activate</code>. Skipping
+          registration does not affect the lookup.</p>
         </div>
       </li>
     </ol>
-    <p style="margin-top:16px">The location fields aren't guessed from your address &mdash;
-    the page loads an IP-geolocation script that writes your city, region, ZIP and IP
-    into cookies, which the logger then reads back. Meanwhile the email itself is
-    checked by a regular expression in your browser; the settings API itself never
-    asks for it.</p>
+    <p>The location fields are not guessed from your address: the page loads an
+    IP-geolocation script that writes your city, region, ZIP, and IP into
+    cookies, which the logger reads back. The email is validated by a regular
+    expression in your browser; the settings API never asks for it.</p>
   </details>
-  <p style="margin-top:14px"><strong>This page uses no analytics or cookies and has
-  no lookup backend.</strong> Every setting is already inside the file your browser downloaded;
-  searching runs locally, and your lot number stays in this tab. The barcode scanner
-  is on-device too: camera frames are decoded in your browser and never uploaded.</p>
+  <p><strong>This page uses no analytics or cookies and has no lookup
+  backend.</strong> Every setting is already inside the file your browser
+  downloaded, so searching runs on your device, and camera frames from the
+  barcode scanner are decoded in your browser and never uploaded. Your lot
+  number stays in this tab unless you tick <em>remember on this device</em>,
+  and a pinned formula keeps only its name, stage, and market &mdash; never the
+  setting, which is looked up fresh on every visit. Both live in this browser
+  alone.</p>
   <p><strong>Historical note:</strong> the discontinued Original Formula Pro is not
   supported by this app. Its frozen crawl is retained only as a research archive;
   none of its values are loaded, searched, or shown here.</p>
@@ -654,9 +685,10 @@ const UHAY = U.map(r => fold(D.B[r[0]] + " " + r[1] + " " + r[2]));
 const UMASK = U.map(r => BigInt("0x" + r[3]));
 
 const el = id => document.getElementById(id);
-const $q=el("q"), $machine=el("machine"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
+const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
       $empty=el("empty"), $mode=el("mode"), $chips=el("chips"),
-      $strip=el("strip"), $lot=el("lot"), $lotrow=el("lotrow"),
+      $lot=el("lot"), $lotrow=el("lotrow"), $lotkeep=el("lotkeep"),
+      $pinrow=el("pinrow"), $pinchips=el("pinchips"),
       $lotstate=el("lotstate"), $machineStep=el("machine-step"),
       $marketStep=el("market-step"), $searchStep=el("search-step"),
       $machineStatus=el("machine-status"), $marketStatus=el("market-status"),
@@ -700,8 +732,9 @@ const tabStore = {
   get(k,d){ try{ return sessionStorage.getItem(k) ?? d }catch(e){ return d } },
   set(k,v){ try{ sessionStorage.setItem(k,v) }catch(e){} }
 };
-// Older builds persisted formula searches. Remove that legacy key once so an
-// upgrade also honors the current session-only privacy boundary.
+// Older builds persisted formula searches without asking. Remove that legacy
+// key once: searches stay session-only, and only an explicit pin or an
+// opted-in lot number persists.
 try{ localStorage.removeItem("brezza.q") }catch(e){}
 
 let machine = store.get("brezza.machine", "");
@@ -731,42 +764,14 @@ $theme.addEventListener("click", () => {
   applyTheme(theme);
 });
 
-function renderStrip(){
-  const c = D.M.counts;
-  const machineNote = machine === "advanced"
-    ? "Advanced / WiFi selected &middot; a few formulas need the machine's lot number before a setting."
-    : machine === "mini"
-      ? "Mini selected &middot; Mini always uses the standard setting; no lot number needed."
-      : "Choose your machine before looking up a setting.";
-  $strip.innerHTML = `<span class="striptag">Current data &middot; Advanced / WiFi / Mini</span>
-    <span>${machineNote} ${c.records.toLocaleString()} settings &middot; last checked against Baby Brezza’s data
-    ${fmtFullDate(D.M.observed || D.M.generated)}</span>`;
-}
-
 function applyMachine(){
-  renderStrip();
   // The current data is shared, but lot-11 alternates belong only to
   // Advanced and Advanced WiFi machines; Mini never takes this branch.
   $lotrow.hidden = machine !== "advanced";
   $scan.hidden = !machine || !canScan;
-  // Examples, not categories: step 3's own label already reads "Brand, formula
-  // name, or barcode", and the brand chips below the field name brands again.
-  // A literal barcode is the one thing nothing else on the page demonstrates,
-  // so the budget buys one brand plus real digits -- that is what teaches a
-  // parent they may type twelve digits into a search box at all. 165.2px into
-  // the 188px this field has at the 390px floor; it also clears 375px, though
-  // the floor stays 390 because the lot placeholder does not. The old copy
-  // needed 299.5px and was clipped mid-barcode on every phone.
-  $q.placeholder = "Similac or 070074680644";
-  const prev = store.get("brezza.terr", "");
-  $territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
-  $terr.value = D.T.includes(prev) ? prev : "";
   document.querySelectorAll("[data-machine]").forEach(button => {
     button.setAttribute("aria-pressed", String(button.dataset.machine === machine));
   });
-
-  $chips.innerHTML = QUICK.filter(b => D.B.includes(b))
-    .map(b => `<button class="chip" type="button">${esc(b)}</button>`).join("");
 }
 
 $chips.addEventListener("click", e => {
@@ -977,10 +982,13 @@ function resultCard(i, terms){
   // A history row names the standard setting outright ("Standard setting:
   // 4 → 5"), so it is withheld with the number itself, like the `was` chip.
   const history = undecided ? "" : historyMarkup(r);
+  // The pin persists on an explicit tap; identity only, never the number.
+  const pinned = pinnedIndex(i) >= 0;
+  const pinBtn = `<button class="pinbtn${pinned ? " on" : ""}" type="button" data-pinbtn="${i}">${pinned ? "Pinned — tap to remove" : "Pin for your next visit"}</button>`;
   return `<li class="rec result${undecided ? " asking" : ""}${thumb ? " hasimg" : ""}">
     <div class="resultdial"><span class="resultlabel">${undecided ? "Needs lot no." : "Your setting"}</span>${undecided ? askSVG() : num ? dialSVG(setting) : stopSVG(setting)}</div>
     <div><p class="name">${mark(label, terms)}</p>
-      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${otherChip}${was}${where}</div>${asklot}${observed}${history}
+      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${otherChip}${was}${where}</div>${asklot}${observed}${history}${pinBtn}
     </div>${thumb}</li>`;
 }
 
@@ -1034,7 +1042,7 @@ function run(){
   if (!machine){
     updateSteps(raw, null);
     $mode.hidden = true; $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
-    $empty.innerHTML = "<p>Start by choosing your machine. Lot numbers beginning with 11 can change settings on Advanced and Advanced WiFi machines; Mini uses the standard setting.</p>";
+    $empty.innerHTML = "<p>Start by choosing your machine.</p>";
     return;
   }
   const {mode, hits, unavailable} = search();
@@ -1044,8 +1052,9 @@ function run(){
   $mode.hidden = mode !== "barcode";
 
   if (!raw){
-    $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
-    $empty.innerHTML = "<p>Enter the brand or formula name on the container, or paste its barcode.</p>";
+    // No hint here: step 3's placeholder and status already instruct, and the
+    // amber `needs` highlight is pointing at them.
+    $count.textContent=""; $out.innerHTML=""; $empty.hidden=true;
     return;
   }
   if (!hits.length && !unavailable.length){
@@ -1105,12 +1114,19 @@ function run(){
   if (resultChanged) requestAnimationFrame(() => $out.firstElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"}));
 }
 
+// Coverage facts only. Which machine is selected already shows in step 1 and
+// the machine-status slot; restating it here said everything twice.
+el("strip").innerHTML =
+  `<span class="striptag">Current data &middot; Advanced / WiFi / Mini</span>
+   <span>${D.M.counts.records.toLocaleString()} settings &middot; last checked against Baby Brezza’s data
+   ${fmtFullDate(D.M.observed || D.M.generated)}</span>`;
+
 el("foot").innerHTML =
   `${D.M.counts.records.toLocaleString()} current settings for Formula Pro Advanced, Advanced WiFi, and Mini across ` +
   `${D.M.counts.territories} markets/territories. Source crawl observed ${fmtFullDate(D.M.observed || D.M.generated)}. ` +
   `${D.M.counts.alt} carry a lot-11 alternate for Advanced / WiFi machines and ` +
   `${D.M.counts.zero} answer with a 0 rather than a dial position. ` +
-  `<p style="margin-top:10px">Unofficial and not affiliated with Baby Brezza &mdash; ` +
+  `<p>Unofficial and not affiliated with Baby Brezza &mdash; ` +
   `built because a safety lookup should not require an email address. All settings ` +
   `come from Baby Brezza's public data. <a href="data/formula_settings.json" download>Download the current dataset</a>.</p>`;
 
@@ -1120,6 +1136,7 @@ function normalizeLot(){
   const raw = $lot.value.trim().toUpperCase();
   if ($lot.value !== raw) $lot.value = raw;
   tabStore.set("brezza.lot", raw);
+  if ($lotkeep.checked) store.set("brezza.lot", raw);
 }
 
 // The caption states what the field is doing right now. It cannot call the lot
@@ -1150,19 +1167,68 @@ function syncLot(blocking){
   }
 }
 
+// ---- opt-in persistence: pinned formulas and the remembered lot ----
+// A pin stores identity and market only -- brand, type, stage, market --
+// never a setting. Restoring replays the lookup through run() against the
+// data this visit downloaded, so a moved setting, a new lot gate, or a
+// removed record shows current truth instead of a saved answer.
+let pins = [];
+try{ pins = JSON.parse(store.get("brezza.pins","[]")).filter(p => p && p.b && p.t) }catch(e){}
+const savePins = () => store.set("brezza.pins", JSON.stringify(pins));
+const pinOf = i => { const r = D.R[i]; return {b:D.B[r[0]], t:r[1], s:r[2], m:market()} };
+const samePin = (a,b) => a.b===b.b && a.t===b.t && a.s===b.s && a.m===b.m;
+const pinnedIndex = i => pins.findIndex(p => samePin(p, pinOf(i)));
+// The record a pin names, preferring one sold in the pin's market; null when
+// the current dataset no longer carries it, in which case run() falls back to
+// whatever the replayed search honestly finds.
+function findPinned(p){
+  const ti = D.T.indexOf(p.m);
+  const bit = ti >= 0 ? (1n << BigInt(ti)) : 0n;
+  let fallback = null;
+  for (let i = 0; i < D.R.length; i++){
+    const r = D.R[i];
+    if (D.B[r[0]] !== p.b || r[1] !== p.t || r[2] !== p.s) continue;
+    if ((MASK[i] & bit) !== 0n) return i;
+    if (fallback == null) fallback = i;
+  }
+  return fallback;
+}
+function renderPins(){
+  $pinrow.hidden = !pins.length;
+  $pinchips.innerHTML = pins.map((p, n) =>
+    `<span class="pin"><button class="chip" type="button" data-pin="${n}">${esc(p.b)} · ${esc(p.t)}${p.s ? ` · ${esc(p.s)}` : ""}</button>` +
+    `<button class="pinx" type="button" data-unpin="${n}" aria-label="Unpin ${escAttr(p.b)} ${escAttr(p.t)}">&times;</button></span>`).join("");
+}
+$pinchips.addEventListener("click", e => {
+  const go = e.target.closest("[data-pin]");
+  if (go){
+    const p = pins[+go.dataset.pin];
+    $terr.value = p.m || "";
+    $q.value = `${p.b} ${p.t}`;
+    chosen = findPinned(p);
+    run();
+    return;
+  }
+  const x = e.target.closest("[data-unpin]");
+  if (x){ pins.splice(+x.dataset.unpin, 1); savePins(); renderPins(); run() }
+});
+
+// The lot is session-only unless this box is ticked; unticking sweeps the
+// kept copy in the same gesture.
+$lotkeep.addEventListener("change", () => {
+  if ($lotkeep.checked) store.set("brezza.lot", $lot.value.trim().toUpperCase());
+  else store.remove("brezza.lot");
+});
+
 $lot.addEventListener("input", run);
 document.querySelectorAll("[data-machine]").forEach(button => button.addEventListener("click", () => {
-  $machine.value = button.dataset.machine;
-  $machine.dispatchEvent(new Event("change", {bubbles:true}));
-}));
-$machine.addEventListener("change", () => {
-  machine = $machine.value;
+  machine = button.dataset.machine;
   chosen = null;
   store.set("brezza.machine", machine);
   applyMachine();
   run();
-  if (machine) $terr.focus({preventScroll:true});
-});
+  $terr.focus({preventScroll:true});
+}));
 
 // ---- barcode scanner ----
 // Native BarcodeDetector where it actually has a backend (Chromium); otherwise
@@ -1284,6 +1350,14 @@ $q.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer =
 $terr.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer = setTimeout(run, 90) });
 $terr.addEventListener("change", () => { chosen = null; run() });
 $out.addEventListener("click", e => {
+  const pinButton = e.target.closest("[data-pinbtn]");
+  if (pinButton){
+    const i = +pinButton.dataset.pinbtn;
+    const n = pinnedIndex(i);
+    if (n >= 0) pins.splice(n, 1); else pins.push(pinOf(i));
+    savePins(); renderPins(); run();
+    return;
+  }
   const preview = e.target.closest("[data-preview]");
   if (preview){
     $imageboximg.src = preview.dataset.preview;
@@ -1307,10 +1381,31 @@ $imageboxclose.addEventListener("click", () => $imagebox.close());
 $imagebox.addEventListener("click", e => {
   if (e.target === $imagebox) $imagebox.close();
 });
-$lot.value = tabStore.get("brezza.lot","");
-$machine.value = machine;
+// Examples, not categories: step 3's own label already reads "Brand, formula
+// name, or barcode", and the brand chips below the field name brands again.
+// A literal barcode is the one thing nothing else on the page demonstrates,
+// so the budget buys one brand plus real digits -- that is what teaches a
+// parent they may type twelve digits into a search box at all. 165.2px into
+// the 188px this field has at the 390px floor; it also clears 375px, though
+// the floor stays 390 because the lot placeholder does not. The old copy
+// needed 299.5px and was clipped mid-barcode on every phone.
+$q.placeholder = "Similac or 070074680644";
+$territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
+const prevTerr = store.get("brezza.terr", "");
+$terr.value = D.T.includes(prevTerr) ? prevTerr : "";
+$chips.innerHTML = QUICK.filter(b => D.B.includes(b))
+  .map(b => `<button class="chip" type="button">${esc(b)}</button>`).join("");
+renderPins();
+// A kept lot exists only if the owner ticked the box, so the ticked state on
+// return is simply whether a kept copy exists.
+const keptLot = store.get("brezza.lot", null);
+$lotkeep.checked = keptLot != null;
+$lot.value = keptLot != null ? keptLot : tabStore.get("brezza.lot","");
 applyMachine();
 $q.value = tabStore.get("brezza.q","");
 run();
-(machine ? (market() ? $q : $terr) : document.querySelector("[data-machine]"))?.focus({preventScroll:true});
+// A returning owner lands ready to type; a fresh visit gets no autofocus --
+// a programmatic focus ring on the first machine button read as a selection
+// that had not happened.
+if (machine) (market() ? $q : $terr).focus({preventScroll:true});
 </script>

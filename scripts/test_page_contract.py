@@ -305,6 +305,37 @@ class PageContractTests(unittest.TestCase):
                     f"makes it true: {window!r}")
         self.assertGreaterEqual(checked, 4, "the scan found nothing to check")
 
+    def test_checks_are_collapsed_and_spacing_lives_in_the_stylesheet(self):
+        """The four checks collapse to their headings and expand on click, and
+        vertical rhythm is stylesheet rules, not per-element inline margins.
+        The inline-style count is a shrink-only ratchet: it reached zero when
+        the editorial's forced breaks were dissolved, and stays there."""
+        self.assertEqual(self.html.count('<details class="check">'), 4)
+        self.assertEqual(self.html.count("<summary><h3>"), 4)
+        self.assertNotIn('style="', build_page.TEMPLATE)
+
+    def test_persistence_is_opt_in_and_stores_identity_never_a_number(self):
+        """Two things may outlive the tab, each behind an explicit action: the
+        lot number behind its checkbox, and pins. A pin is identity and market
+        only -- the setting is looked up fresh each visit by replaying the pin
+        through run(), so revised data always wins over a saved answer. The
+        browser walk enforces the same shape on the stored JSON itself."""
+        template = build_page.TEMPLATE
+        # the lot persists only while the box is ticked; unticking sweeps it
+        self.assertIn('if ($lotkeep.checked) store.set("brezza.lot", raw);', template)
+        self.assertIn('else store.remove("brezza.lot");', template)
+        # the pin shape is named once, and carries no setting column
+        self.assertIn("const pinOf = i => { const r = D.R[i]; "
+                      "return {b:D.B[r[0]], t:r[1], s:r[2], m:market()} };",
+                      template)
+        # restore resolves through the ordinary flow, not from the stored pin
+        self.assertIn("chosen = findPinned(p);", template)
+        # the searched query itself still never lands in localStorage
+        self.assertIn('tabStore.set("brezza.q", raw)', template)
+        self.assertNotIn('store.set("brezza.q"', template)
+        # the editorial states the boundary the feature must keep
+        self.assertIn("never the\n  setting, which is looked up fresh", self.html)
+
     def test_local_build_has_no_placeholder_repository_links(self):
         self.assertNotIn("USER/REPO", self.html)
         self.assertIn('href="data/formula_settings.json"', self.html)

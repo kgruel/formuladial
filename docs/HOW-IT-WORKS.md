@@ -32,10 +32,15 @@ The point of the local snapshot is that a search is a local operation: the
 formula text, barcode, market, machine choice, and lot number must not be sent
 to any service. The machine and market may be remembered for convenience, but
 the current formula query is session-only (in-memory or `sessionStorage`), not
-in persistent `localStorage`; closing the tab should clear it. A future change
-to persistence needs to preserve that boundary and should never store a lot
-number or formula-search history by default. The setting-change timeline is
-public source-data history and contains no user activity.
+in persistent `localStorage`; closing the tab should clear it. Nothing else
+persists by default. Two things persist on an explicit action, in
+`localStorage` only: the lot number, behind a "remember on this device"
+checkbox (unticking removes the kept copy), and pinned formulas, which store
+identity alone — brand, type, stage, market — never a setting. A pin is
+replayed through the normal lookup against the data the visit downloaded, so
+a revised setting or a new lot gate always shows current truth rather than a
+saved answer. The setting-change timeline is public source-data history and
+contains no user activity.
 
 The deployed page must also be self-contained with respect to presentation
 assets. Fonts and scripts should be bundled or served from this repository,
