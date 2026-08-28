@@ -336,6 +336,24 @@ class PageContractTests(unittest.TestCase):
         # the editorial states the boundary the feature must keep
         self.assertIn("never the\n  setting, which is looked up fresh", self.html)
 
+    def test_link_unfurls_carry_the_card(self):
+        self.assertEqual(build_page.SITE_URL, "https://formuladial.com")
+        self.assertIn('<meta property="og:image" content="https://formuladial.com/og.png">',
+                      self.html)
+        self.assertIn('<meta name="twitter:card" content="summary_large_image">', self.html)
+        # one tagline, two renderings: plain in the metas, entity mdash in the lede
+        self.assertIn('content="%s"' % build_page.TAGLINE, self.html)
+        self.assertIn(build_page.TAGLINE.replace("\u2014", "&mdash;"), self.html)
+        # unfurl scrapers read a bounded prefix of this 0.6 MB page: the card
+        # metas must precede the stylesheet and everything after it
+        self.assertLess(self.html.index("og:image"), self.html.index("<style>"))
+        # the committed image really is the size the metas declare
+        with open(os.path.join(ROOT, "site", "og.png"), "rb") as f:
+            head = f.read(24)
+        self.assertEqual(head[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual((int.from_bytes(head[16:20], "big"),
+                          int.from_bytes(head[20:24], "big")), (1200, 630))
+
     def test_the_page_links_its_published_repository(self):
         self.assertNotIn("USER/REPO", self.html)
         self.assertIn('href="https://github.com/kgruel/formuladial"', self.html)

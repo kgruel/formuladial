@@ -27,6 +27,12 @@ OUT = "site/index.html"
 # the build must be deterministic -- the same page locally and in CI -- so the
 # committed site/index.html is always exactly what a rebuild produces.
 REPO_URL = "https://github.com/kgruel/formuladial"
+SITE_URL = "https://formuladial.com"
+
+# One sentence, two renderings: the hero lede (HTML) and the description /
+# og:description metas (plain). A single source so the copy cannot drift.
+TAGLINE = ("Every powder setting Baby Brezza publishes, searchable in your "
+           "browser \u2014 no email address required, local to your device.")
 
 
 def thumb_of(image):
@@ -174,6 +180,7 @@ def hero_mark(rows, unit=20):
 TEMPLATE = r"""<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Formula Dial &mdash; Baby Brezza powder settings</title>
+__SOCIAL_META__
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='41' fill='%23f6e6cd' stroke='%23c9821a' stroke-width='9'/><line x1='50' y1='50' x2='50' y2='17' stroke='%235a3a08' stroke-width='10' stroke-linecap='round' transform='rotate(216 50 50)'/><circle cx='50' cy='50' r='7' fill='%235a3a08'/></svg>">
 <script>
 /* Before first paint: a stored theme choice must not flash the other one. */
@@ -631,8 +638,7 @@ footer p{margin:10px 0 0}
   <div class="hrow">
     <div class="hcol">
       <h1>What setting does this formula need?</h1>
-      <p class="lede">Every powder setting Baby Brezza publishes, searchable in your
-      browser &mdash; no email address required, local to your device.</p>
+      <p class="lede">__TAGLINE_HTML__</p>
     </div>
     __HERO_MARK__
   </div>
@@ -1601,7 +1607,23 @@ def main():
         f'<a href="{repo}">Source and dataset</a> &middot; '
         f'<a href="{repo}/blob/main/docs/HOW-IT-WORKS.md">How it works</a>.'
     )
+    social = "\n".join([
+        f'<meta name="description" content="{TAGLINE}">',
+        '<meta property="og:type" content="website">',
+        '<meta property="og:site_name" content="Formula Dial">',
+        '<meta property="og:title" content="Formula Dial \u2014 Baby Brezza powder settings">',
+        f'<meta property="og:description" content="{TAGLINE}">',
+        f'<meta property="og:url" content="{SITE_URL}/">',
+        f'<meta property="og:image" content="{SITE_URL}/og.png">',
+        '<meta property="og:image:width" content="1200">',
+        '<meta property="og:image:height" content="630">',
+        '<meta property="og:image:alt" content="A measuring dial beside the question: '
+        'what setting does this formula need?">',
+        '<meta name="twitter:card" content="summary_large_image">',
+    ])
     html = (TEMPLATE
+            .replace("__SOCIAL_META__", social)
+            .replace("__TAGLINE_HTML__", TAGLINE.replace("\u2014", "&mdash;"))
             .replace("__DATA__", json.dumps(packed, ensure_ascii=False, separators=(",", ":")))
             .replace("__QUICK__", json.dumps(quick, ensure_ascii=False))
             .replace("__HERO_MARK__", hero_mark(packed["R"]))
