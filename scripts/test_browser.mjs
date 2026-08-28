@@ -2,7 +2,7 @@
 /** End-to-end confidence-flow checks against the generated static page. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -104,7 +104,11 @@ async function main() {
   assert.equal(await evaluate("getComputedStyle(lotrow).display"), "none",
     "Mini lot input must be visually absent, not only marked hidden");
   assert.equal(await evaluate("document.getElementById('market-step').classList.contains('needs')"), true);
-  assert.match(await evaluate("count.textContent"), /choose where the formula was sold/);
+  assert.match(await evaluate("count.textContent"), /^1 possible match$/,
+    "The count slot states the quantity and nothing else");
+  assert.match(await evaluate("out.querySelector('.choicehead h2').textContent"),
+    /choose where it was sold/,
+    "The imperative the count used to duplicate must still be in the heading below it");
   assert.equal(await evaluate("out.querySelectorAll('.dialsvg').length"), 0,
     "Anywhere must never reveal an actionable dial");
 
@@ -114,7 +118,7 @@ async function main() {
     "The market input must not draw a second focus ring inside its control");
   assert.notEqual(await evaluate("getComputedStyle(terr.closest('.terr')).boxShadow"), "none",
     "The market control shell must carry the focus highlight");
-  assert.match(await evaluate("count.textContent"), /Exact formula match/);
+  assert.match(await evaluate("count.textContent"), /^Exact formula match/);
   assert.equal(await evaluate("out.querySelector('.dialsvg text').textContent"), "4");
   assert.equal(await evaluate("out.querySelector('.rec.result') !== null"), true);
   assert.equal(await evaluate("out.querySelector('.rec.result .dialsvg').getBoundingClientRect().width >= 96"), true);
@@ -146,7 +150,11 @@ async function main() {
 
   await setValue("q", "9347832001272", "input");
   await setValue("terr", "Australia/New Zealand");
-  assert.match(await evaluate("count.textContent"), /2 possible matches/);
+  assert.match(await evaluate("count.textContent"), /^2 possible matches$/,
+    "The count slot states the quantity and nothing else");
+  assert.match(await evaluate("out.querySelector('.choicehead h2').textContent"),
+    /which formula matches your container\?/,
+    "The imperative the count used to duplicate must still be in the heading below it");
   assert.equal(await evaluate("out.querySelectorAll('[data-choice]').length"), 2);
   assert.equal(await evaluate("out.querySelectorAll('.dialsvg').length"), 0,
     "An ambiguous barcode must not reveal either setting");
@@ -186,6 +194,357 @@ async function main() {
   }
   assert.equal(await evaluate("localStorage.getItem('brezza.q')"), null,
     "An upgrade must clear formula searches persisted by older builds");
+
+  // The lot placeholder is authored copy, not a lot number: text-transform must
+  // normalise what the owner types without uppercasing -- and clipping -- it.
+  await setValue("machine", "advanced");
+  assert.equal(await evaluate("lotrow.hidden"), false, "Advanced must expose the lot input");
+  assert.equal(await evaluate("getComputedStyle(lot).textTransform"), "uppercase",
+    "A typed lot number must still be normalised to uppercase");
+  await evaluate("document.fonts.ready.then(() => true)");
+  const overflowingPlaceholders = () => evaluate(`(() => {
+    const canvas = document.createElement("canvas").getContext("2d");
+    return [...document.querySelectorAll("input[placeholder]")]
+      .filter(input => input.getClientRects().length)
+      .map(input => {
+        const style = getComputedStyle(input, "::placeholder");
+        const text = style.textTransform === "uppercase"
+          ? input.placeholder.toUpperCase() : input.placeholder;
+        canvas.font = [style.fontStyle, style.fontWeight, style.fontSize, style.fontFamily].join(" ");
+        return { id: input.id, text, width: canvas.measureText(text).width, room: input.clientWidth };
+      })
+      .filter(measured => measured.width > measured.room);
+  })()`);
+  // The viewport widths this page's copy is budgeted for. "Every placeholder
+  // fits" is only ever true at some width, so the widths are named here rather
+  // than being whatever the harness last set -- that is how this check read
+  // green at 1280 while the search placeholder had been clipped on every phone.
+  // 390 is the floor by decision: iPhone 12-16, Pixel, current Android. 375 and
+  // below (iPhone SE 2/3, 8, 13 mini) are out of scope -- neither the search
+  // copy (fails at 380) nor the lot copy (fails at 375) fits there. Adding a
+  // width here is a copy-budget decision, not a test tweak: review it as one.
+  const SUPPORTED_WIDTHS = [1280, 390];
+  for (const width of SUPPORTED_WIDTHS) {
+    await send("Emulation.setDeviceMetricsOverride",
+      { width, height: 844, deviceScaleFactor: 1, mobile: width < 700 });
+    await settle();
+    await evaluate("document.fonts.ready.then(() => true)");
+    assert.equal(await evaluate("lotrow.hidden"), false,
+      `The ${width}px placeholder pass is vacuous unless the lot input is shown`);
+    const clipped = await overflowingPlaceholders();
+    assert.deepEqual(clipped, [], clipped.map(one =>
+      `At ${width}px, #${one.id} placeholder ${JSON.stringify(one.text)} renders ` +
+      `${one.width.toFixed(1)}px into ${one.room}px of control: clipped by ` +
+      `${(one.width - one.room).toFixed(1)}px`).join("\n"));
+  }
+  // ---- the heading holds its line beside the mark ----
+  // The header puts the mark beside the heading above 900px. Its predecessor
+  // did the same at every width, which left the h1 only 56px of slack at 768
+  // and wrapped it. The rule is that the heading holds one line wherever the
+  // layout is wide enough to be a heading -- pinned by measurement, not by
+  // class name, so a two-column header under any name has to satisfy it.
+  const HEADING_WIDTHS = [1280, 1024, 900, 899, 820, 768];
+  for (const width of HEADING_WIDTHS) {
+    await send("Emulation.setDeviceMetricsOverride",
+      { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await settle();
+    await evaluate("document.fonts.ready.then(() => true)");
+    const lines = await evaluate(`(() => {
+      const h = document.querySelector("h1");
+      return Math.round(h.getBoundingClientRect().height
+        / parseFloat(getComputedStyle(h).lineHeight));
+    })()`);
+    assert.equal(lines, 1,
+      `The heading must hold one line at ${width}px; it wrapped onto ${lines}`);
+    assert.equal(
+      await evaluate(`getComputedStyle(document.querySelector(".hrow")).display`),
+      width >= 900 ? "grid" : "block",
+      `At ${width}px the header must ${width >= 900 ? "sit two-column" : "stack"}`);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+  await settle();
+
+  await send("Emulation.clearDeviceMetricsOverride");
+  await settle();
+
+  // ---- the lot number as a conditional fourth gate ----
+  // Everything else on this page refuses a number until the ambiguity
+  // resolves. Where a record carries an alternate, an unentered lot is exactly
+  // that kind of ambiguity, so it is walked here in all of its states: gated,
+  // resolved both ways, and the three shapes it must never fire in.
+  const dialNumbers = () =>
+    evaluate("[...out.querySelectorAll('.dialsvg text')].map(t => t.textContent)");
+  const stepClasses = id =>
+    evaluate(`[...document.getElementById(${JSON.stringify(id)}).classList]`);
+
+  await setValue("terr", "United States of America");
+  await setValue("lot", "", "input");
+  await setValue("q", "bobbie organic gentle", "input");
+  assert.deepEqual(await dialNumbers(), ["?"],
+    "A formula whose setting depends on the lot must show no dial number");
+  assert.equal(await evaluate("out.querySelector('.rec.result.asking') !== null"), true);
+  assert.match(await evaluate("out.querySelector('.asklot').textContent"),
+    /depends on your machine’s lot number.*sticker underneath the machine and enter the lot number in step 1/s,
+    "The reason must be visible copy, not a title tooltip that touch cannot open");
+  assert.equal(await evaluate("out.querySelector('.asklot').getClientRects().length > 0"), true,
+    "The prompt must be rendered, not merely present in the markup");
+  // amber, not either of the two red stop faces: this state is answerable.
+  // resolved through a probe so a token and a painted stroke are comparable
+  const resolveToken = token => evaluate(`(() => { const probe = document.createElement("span"); ` +
+    `probe.style.color = "var(${token})"; document.body.append(probe); ` +
+    `const painted = getComputedStyle(probe).color; probe.remove(); return painted })()`);
+  const askStroke = await evaluate("getComputedStyle(out.querySelector('.rec.result .dialsvg circle')).stroke");
+  const stopStroke = await resolveToken("--stop");
+  const dialStroke = await resolveToken("--dial");
+  assert.notEqual(askStroke, stopStroke, "The lot-gated face must not borrow the stop red");
+  assert.equal(askStroke, dialStroke, "The lot-gated face belongs to the --dial amber family");
+  // the blocker moves to step 1; step 3 has resolved and keeps its tick.
+  assert.deepEqual(await stepClasses("machine-step"), ["step", "needs"]);
+  assert.deepEqual(await stepClasses("search-step"), ["step", "searchstep", "done"]);
+  assert.equal(await evaluate("document.getElementById('machine-status').textContent"),
+    "Lot number needed");
+  assert.equal(await evaluate("lotstate.className"), "lotstate need");
+
+  await setValue("lot", "1123ABC", "input");
+  assert.deepEqual(await dialNumbers(), ["6"], "A lot-11 machine takes the alternate");
+  assert.equal(await evaluate("out.querySelector('.rec.result.asking')"), null);
+  await setValue("lot", "2200XYZ", "input");
+  assert.deepEqual(await dialNumbers(), ["5"], "Any other lot takes the standard number");
+  assert.equal(await evaluate("out.querySelector('.rec.result.asking')"), null);
+
+  // a record with no alternate: the lot changes nothing, so it never gates.
+  await setValue("lot", "", "input");
+  await setValue("q", "A2 Milk Platinum", "input");
+  assert.deepEqual(await dialNumbers(), ["4"],
+    "A formula without an alternate must answer with a blank lot field");
+  assert.deepEqual(await stepClasses("machine-step"), ["step", "done"]);
+
+  // Mini never reads the lot, so it is never gated by one.
+  await setValue("machine", "mini");
+  await setValue("terr", "United States of America");
+  await setValue("q", "bobbie organic gentle", "input");
+  assert.deepEqual(await dialNumbers(), ["5"],
+    "Mini always answers with the standard setting, gate or no gate");
+  assert.equal(await evaluate("out.querySelector('.std')"), null,
+    "Mini must not be told about the lot-11 alternate it cannot use");
+
+  // two of the 99 alternates are 0: the gate must be able to land in the
+  // existing red no-dial-position face, not only on a number.
+  await setValue("machine", "advanced");
+  await setValue("terr", "United States of America");
+  await setValue("lot", "11ABCD", "input");
+  await setValue("q", "enfagrow gentlease toddler", "input");
+  assert.deepEqual(await dialNumbers(), ["0"]);
+  assert.match(await evaluate("out.querySelector('.nope').textContent"), /No dial position/);
+  assert.equal(await evaluate("getComputedStyle(out.querySelector('.rec.result .dialsvg circle')).stroke"),
+    stopStroke, "A lot-11 alternate of 0 is a stop, and takes the stop red");
+  await setValue("lot", "", "input");
+  assert.deepEqual(await dialNumbers(), ["?"],
+    "The same record with no lot is undecided, not a stop");
+
+  // a row Baby Brezza publishes no setting for is a candidate, not a choice:
+  // it forces the choice state and is listed below as context.
+  await setValue("terr", "Australia/New Zealand");
+  await setValue("q", "neocate syneo", "input");
+  assert.match(await evaluate("count.textContent"), /^2 possible matches$/);
+  assert.equal(await evaluate("out.querySelectorAll('[data-choice]').length"), 1);
+  assert.equal(await evaluate("out.querySelectorAll('.warning').length"), 1,
+    "The row with no published setting is listed, and says so");
+  assert.deepEqual(await dialNumbers(), ["×"],
+    "A same-named row with no setting must not leave a number asserted as exact");
+  await evaluate("out.querySelector('[data-choice]').click()");
+  await settle();
+  assert.deepEqual(await dialNumbers(), ["4", "×"],
+    "Choosing resolves the ambiguity and keeps the unavailable sibling as context");
+
+  // step 3 is done when the search has resolved, never because it has text.
+  await setValue("terr", "United States of America");
+  await setValue("q", "xyzzy-nonsense", "input");
+  assert.deepEqual(await stepClasses("search-step"), ["step", "searchstep", "needs"],
+    "A search with no match has not resolved, so it cannot be ticked done");
+  assert.match(await evaluate("empty.textContent"), /Nothing matching that/);
+
+  // forced-colors drops box-shadow and border-color, so the shell ring above is
+  // invisible there; only a real outline keeps keyboard focus visible.
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "forced-colors", value: "active" }],
+  });
+  await evaluate("q.focus()");
+  await settle();
+  assert.notEqual(await evaluate("getComputedStyle(q).outlineStyle"), "none",
+    "Focus must stay visible as an outline under forced-colors");
+  assert.notEqual(await evaluate("getComputedStyle(q).outlineWidth"), "0px",
+    "The forced-colors focus outline must have width");
+  await send("Emulation.setEmulatedMedia", { features: [] });
+
+  // ---- the payload column census ---------------------------------------
+  // This block must stay last: it navigates the shared CDP target to an
+  // instrumented copy of the page, so anything asserted after it would be
+  // asserted against the wrong document.
+  // The ratchet: every column packed into the page payload must be read by
+  // the page. A column nothing consumes is dead weight shipped to every
+  // visitor -- an `image_date` column rode along through a redesign that
+  // stopped rendering it, 3,538 date literals and ~46KB, before this existed.
+  //
+  // Scope of the claim, deliberately narrow: this proves each packed index is
+  // *accessed* while the page runs under the states driven below. It does not
+  // claim the value renders, or that the column earns its bytes -- a mere
+  // truthiness guard (`!r[9]`) counts as access. It is a location claim
+  // ("nothing reads index N"), never a verdict that a column is well used.
+  //
+  // Runtime rather than static source parsing, by choice. A regex over the
+  // emitted JS cannot tell an `r` bound to a record from an `r` bound to an
+  // unavailable row -- the two schemas share the name and overlap in width --
+  // and it goes quietly vacuous the moment the packing shape moves, which is
+  // the worst failure a ratchet can have. This one fails the other way: loud,
+  // naming the index and its column, and the only two ways to make it pass
+  // are to delete the column or to drive the state that reads it. So every
+  // payload column ends up carrying an end-to-end proof that it reaches the
+  // page. The cost is honest and worth naming: a column read only in a state
+  // nobody drives here reads as dead. That is the direction to fail in.
+  const censusRoot = mkdtempSync(join(tmpdir(), "brezza-census-"));
+  // Wrap every packed tuple before the page derives anything from it. HAY and
+  // MASK are built from D.R two lines below this anchor, so instrumenting
+  // after load would miss brand/type/stage/territories and need a hand-written
+  // exemption for them -- exactly the quiet allowlist this test exists to
+  // prevent. Numeric property reads are recorded; everything else passes
+  // through untouched.
+  const INSTRUMENT = `
+const __census = {seen:{R:new Set(),V:new Set(),E:new Set(),U:new Set()},width:{},count:{}};
+window.__census = __census;
+(() => {
+  const watch = (tuple, key) => new Proxy(tuple, {get(target, prop, receiver){
+    if (typeof prop === "string" && String(+prop) === prop) __census.seen[key].add(+prop);
+    return Reflect.get(target, prop, receiver);
+  }});
+  const census = (tuples, key) => {
+    __census.count[key] = tuples.length;
+    __census.width[key] = [...new Set(tuples.map(t => t.length))].sort((a,b) => a - b);
+    return tuples.map(t => watch(t, key));
+  };
+  const variants = [], events = [];
+  for (const row of D.R){
+    if (row[9]) variants.push(...row[9]);
+    if (row[10]) events.push(...row[10]);
+  }
+  const watchedVariants = census(variants, "V"), watchedEvents = census(events, "E");
+  let vi = 0, ei = 0;
+  for (const row of D.R){
+    if (row[9]) row[9] = row[9].map(() => watchedVariants[vi++]);
+    if (row[10]) row[10] = row[10].map(() => watchedEvents[ei++]);
+  }
+  D.R = census(D.R, "R");
+  D.U = census(D.U || [], "U");
+})();
+`;
+  const ANCHOR = "\nconst QUICK = ";
+  const shipped = readFileSync(join(root, "site/index.html"), "utf8");
+  assert.equal(shipped.split(ANCHOR).length - 1, 1,
+    `The census anchor ${JSON.stringify(ANCHOR)} must appear exactly once in the built page`);
+  const censusPage = join(censusRoot, "index.html");
+  writeFileSync(censusPage, shipped.replace(ANCHOR, `\n${INSTRUMENT}\n${ANCHOR.trim()} `));
+  await send("Page.navigate", { url: pathToFileURL(censusPage).href });
+  for (let tries = 0; tries < 80; tries += 1) {
+    try {
+      if (await evaluate("document.readyState === 'complete' && typeof run === 'function' && !!window.__census")) break;
+    } catch {}
+    await pause(50);
+  }
+  assert.equal(await evaluate("!!window.__census"), true,
+    "The instrumented copy of the page did not install the column recorder");
+
+  // Every drive is written out from scratch -- the instrumented copy is a
+  // different file:// document, so nothing carries over from the walk above.
+  // Each one names the columns it exists to reach; deleting one silently
+  // narrows the census, so treat these as the census's coverage argument.
+  const censusDrive = async (fields, note) => {
+    for (const [id, value] of fields) await setValue(id, value, "input");
+    // A result card is where most columns are read; an ambiguous search stops
+    // at choices, so settle it the way an owner would.
+    if (await evaluate("out.querySelector('.rec.result') === null && out.querySelector('[data-choice]') !== null")) {
+      await evaluate("out.querySelector('[data-choice]').click()");
+      await settle();
+    }
+    assert.notEqual(await evaluate("out.innerHTML.length"), 0, `census drive rendered nothing: ${note}`);
+  };
+  await setValue("machine", "advanced");
+  // Albania carries all three schemas: a territory-variant record with its own
+  // photo, `was` rows, and an unavailable row with a barcode.
+  // barcode over both lists: R.upc on plain rows, V.territories + V.upc on the
+  // variant rows, U.upc on the unavailable rows.
+  await censusDrive([["terr", "Albania"], ["lot", "2200XYZ"], ["q", "8718117609512"]],
+    "barcode in a market that holds a territory-variant record");
+  // the resolved variant record: V.thumb comes only from rowThumb, and only on
+  // a row where a variant matches the selected market.
+  await censusDrive([["q", "aptamil ar 2 (switzerland)"]],
+    "a resolved territory-variant record");
+  assert.equal(await evaluate("out.querySelector('.rec.result .thumb').src.includes('4277-')"), true,
+    "the variant drive must render the photo the selected variant carries, not the record's own");
+  // a plain record with a struck-out `was`: R.was, R.thumb, R.events.
+  await censusDrive([["q", "bebilon prosyneo ha hydrolyzed advance 3"]],
+    "a record carrying a `was` chip");
+  assert.equal(await evaluate("out.querySelector('.rec.result .was') !== null"), true,
+    "the `was` drive must actually render a was chip, or it does not reach R.was");
+  // the unavailable card: U.reason and U.thumb.
+  await censusDrive([["q", "milupa"]], "a known-unavailable row");
+  assert.equal(await evaluate("out.querySelector('.warning') !== null"), true,
+    "the unavailable drive must render an unavailable card, or it does not reach U.reason");
+  // the lot gate reads R.setting and R.alt_setting through both branches.
+  await censusDrive([["lot", ""], ["terr", "United States of America"],
+                     ["q", "bobbie organic gentle"]], "a lot-gated record");
+  await censusDrive([["lot", "1123ABC"]], "the same record on a lot-11 machine");
+
+  // Packed column order, from pack() in build_page.py. These names only label
+  // the failure; the widths are read from the payload itself, so a stale name
+  // here can never make a dead column pass.
+  const COLUMNS = {
+    R: ["brand", "type", "stage", "setting", "territories", "upc", "alt_setting",
+        "was", "thumb", "variants", "events"],
+    V: ["territories", "upc", "thumb"],
+    E: ["observed", "field", "from", "to", "territory"],
+    U: ["brand", "type", "stage", "territories", "reason", "upc", "thumb"],
+  };
+  const SCHEMA_NAMES = { R: "record", V: "territory variant", E: "setting-history event",
+                         U: "known-unavailable row" };
+  // Columns that legitimately ship unread. SHRINK-ONLY: entries may be removed,
+  // never added. A column nothing reads is a column to delete, not one to park
+  // here -- an addition is a change to the rule this test enforces, and has to
+  // be argued as one rather than slipped in as a test fix.
+  const UNREAD_ALLOWED = { R: [], V: [], E: [], U: [] };
+
+  const census = await evaluate(`(() => { const c = window.__census; return {
+    seen: Object.fromEntries(Object.entries(c.seen).map(([k,v]) => [k, [...v].sort((a,b) => a-b)])),
+    width: c.width, count: c.count } })()`);
+  for (const key of Object.keys(COLUMNS)) {
+    const { [key]: names } = COLUMNS;
+    const count = census.count[key], widths = census.width[key];
+    if (count === 0) {
+      // Nothing of this shape is packed, so there are no bytes to be dead. The
+      // requirement re-arms by itself the moment the payload carries one --
+      // which will need a drive above for it.
+      console.log(`  column census: 0 ${SCHEMA_NAMES[key]} tuples packed; nothing to assert`);
+      continue;
+    }
+    assert.equal(widths.length, 1,
+      `${SCHEMA_NAMES[key]} tuples are packed at mixed widths ${JSON.stringify(widths)}; ` +
+      "the census cannot say which column is which");
+    const [width] = widths;
+    assert.equal(width, names.length,
+      `${SCHEMA_NAMES[key]} tuples are packed ${width} wide but COLUMNS.${key} names ` +
+      `${names.length} (${names.join(", ")}). Update the names in this census to match pack().`);
+    const unread = [];
+    for (let i = 0; i < width; i += 1)
+      if (!census.seen[key].includes(i) && !UNREAD_ALLOWED[key].includes(i)) unread.push(i);
+    assert.deepEqual(unread, [], unread.map(i =>
+      `Packed but never read: ${SCHEMA_NAMES[key]} column ${i} (${names[i] ?? "unnamed"}), ` +
+      `shipped on ${count} tuple${count === 1 ? "" : "s"} of the payload. Either the page ` +
+      "stopped reading it and pack() should stop packing it, or the state that reads it is " +
+      "not driven in the census above.").join("\n"));
+  }
+  console.log(`  column census: ${Object.entries(census.count)
+    .map(([k, n]) => `${k}=${census.width[k]?.[0] ?? 0}x${n}`).join(" ")} all columns read`);
+  rmSync(censusRoot, { recursive: true, force: true });
+
 
   socket.close();
   console.log("browser confidence flow: ok");

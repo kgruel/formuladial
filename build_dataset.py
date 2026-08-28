@@ -384,8 +384,10 @@ def main():
         "label": "Formula Pro Advanced",
         "note": "Covers Formula Pro Advanced, Advanced WiFi and Mini — "
                 "Baby Brezza's finder sends the identical query for all three. "
-                "Enter your lot number below if it starts with 11 — 99 formulas "
-                "have a second setting for those machines. The Mini never uses it.",
+                "99 formulas have a second setting for Advanced machines whose "
+                "lot number starts with 11; on those, a consumer of this data "
+                "must resolve the lot number before showing a setting. The Mini "
+                "never uses them.",
         "source": BASE,
         "counts": counts(
             advanced, unavailable, adv_conflicts,

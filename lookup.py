@@ -6,6 +6,10 @@
     ./lookup.py similac --alt-only       # formulas with a lot-number variant
     ./lookup.py similac 360 --lot 11X    # numbers for a lot-11 Advanced
 
+For the 99 formulas that carry an alternate the lot number decides the answer,
+so a lookup without ``--lot`` is ``ambiguous`` rather than a standard setting
+with a footnote.
+
 Searches only the current Formula Pro Advanced-family snapshot. The
 discontinued original Formula Pro is intentionally unavailable as a lookup;
 its frozen crawl remains under data/legacy/ solely as a historical artifact.
@@ -153,12 +157,32 @@ def setting_variants(records, lot=""):
     return {_effective_setting(r, lot) for r in records}
 
 
+def lot_undecided(records, lot=""):
+    """Whether an unentered lot number still decides one of these settings.
+
+    A location claim, not a verdict: it says the answer depends on something
+    the lookup has not been given, never that the standard number is wrong or
+    unsafe.  Only records whose alternate would actually change the number
+    count, so the ``--lot`` flag stays optional everywhere else.
+    """
+    if lot.strip():
+        return False
+    return any(_effective_setting(r, "11") != _effective_setting(r, "")
+               for r in records)
+
+
 def classify_results(hits, unavailable=None, mode="text", territory=None, lot=""):
     """Classify a lookup into a small, safety-oriented confidence contract.
 
     Text searches can intentionally return a list of formula choices; multiple
     hits are therefore ``ambiguous``. Barcode matches are exact-product
     lookups, but two different effective settings are also ``ambiguous``.
+    A lone record whose setting depends on a lot number that no ``--lot``
+    supplied is the same condition -- one record carrying two answers rather
+    than two records -- so it takes that state rather than a fifth one.
+    A row Baby Brezza publishes no setting for is a candidate too: while one
+    sits beside the hit, the lookup has found two things the tin might be and
+    ``unique`` would be a verdict the data cannot carry.
     As in the browser app, a missing territory keeps even one candidate
     non-actionable. ``known_unavailable`` always wins when there is no usable
     record, while an empty result is ``not_found``.
@@ -171,7 +195,9 @@ def classify_results(hits, unavailable=None, mode="text", territory=None, lot=""
         return "ambiguous"
     if mode == "barcode" and len(setting_variants(hits, lot)) > 1:
         return "ambiguous"
-    return "unique" if len(hits) == 1 else "ambiguous"
+    if lot_undecided(hits, lot):
+        return "ambiguous"
+    return "unique" if len(hits) == 1 and not unavailable else "ambiguous"
 
 
 def show(recs, territory_filter, lot="", reveal=True, blocked_label="CHOOSE TIN"):
@@ -211,6 +237,24 @@ def show(recs, territory_filter, lot="", reveal=True, blocked_label="CHOOSE TIN"
             print(f"{'':>11}{where}")
 
 
+def show_unavailable(rows, lead):
+    """Name the known products the snapshot has no dial setting for.
+
+    Withholding a number without naming the competing candidate would leave a
+    lookup no way to narrow itself, so both states that hold one back -- the
+    terminal ``known_unavailable`` and an ``ambiguous`` result with a sibling
+    beside it -- print the same list.
+    """
+    if not rows:
+        return
+    print(lead)
+    for r in rows:
+        label = " — ".join(str(r.get(k, "")) for k in ("brand", "type") if r.get(k))
+        stage = f"  stage {r['stage']}" if r.get("stage") else ""
+        reason = f" ({r['reason']})" if r.get("reason") else ""
+        print(f"  {label}{stage}{reason}")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -219,7 +263,8 @@ def main():
     p.add_argument("-t", "--territory", help="restrict to a territory (substring)")
     p.add_argument("--brands", action="store_true", help="list brands instead of settings")
     p.add_argument("--lot", default="",
-                   help="machine lot number; one starting 11 selects the alternate settings")
+                   help="machine lot number; required where a formula has an "
+                        "alternate, since one starting 11 selects it")
     p.add_argument("--alt-only", action="store_true",
                    help="only formulas with a lot-number alternate setting")
     p.add_argument("--json", action="store_true", help="raw JSON output")
@@ -273,30 +318,36 @@ def main():
         return
 
     if state == "known_unavailable":
-        print("Known formula, but Baby Brezza publishes no usable dial setting "
-              "for it in this snapshot. Do not guess a number; contact Baby Brezza.")
-        for r in unavailable_hits:
-            label = " — ".join(str(r.get(k, "")) for k in ("brand", "type") if r.get(k))
-            stage = f"  stage {r['stage']}" if r.get("stage") else ""
-            reason = f" ({r['reason']})" if r.get("reason") else ""
-            print(f"  {label}{stage}{reason}")
+        show_unavailable(
+            unavailable_hits,
+            "Known formula, but Baby Brezza publishes no usable dial setting "
+            "for it in this snapshot. Do not guess a number; contact Baby Brezza.")
         return
     if state == "not_found":
         print("No match.")
         return
     if state == "ambiguous":
+        blocked_label = "CHOOSE TIN"
         if not a.territory:
             print("Choose the market with --territory before using a dial number.")
             blocked_label = "CHOOSE TERRITORY"
-        elif mode == "barcode":
+        elif len(hits) > 1 and mode == "barcode":
             print("Barcode matches multiple tins or settings in the selected territory. "
                   "Refine the lookup or verify the tin with Baby Brezza.")
-            blocked_label = "CHOOSE TIN"
-        else:
+        elif len(hits) > 1:
             print("Several formulas match. Refine the search to the exact tin before "
                   "using a dial number.")
-            blocked_label = "CHOOSE TIN"
+        elif unavailable_hits:
+            print("Another formula matching this lookup has no published setting, so "
+                  "this is not an exact match. Identify the tin in hand before using "
+                  "a dial number.")
+        else:
+            print("This formula's setting depends on the machine's lot number. "
+                  "Check the sticker underneath the machine and pass --lot.")
+            blocked_label = "NEED LOT"
         show(hits, terr, a.lot, reveal=False, blocked_label=blocked_label)
+        show_unavailable(unavailable_hits,
+                         "  also matching, with no published setting:")
     else:
         show(hits, terr, a.lot)
     if hits:

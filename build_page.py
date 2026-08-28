@@ -91,7 +91,7 @@ def pack(doc):
             for t in variant["territories"]:
                 variant_mask |= 1 << ti[t]
             variants.append([format(variant_mask, "x"), variant.get("upc", []),
-                             variant.get("image_date"), thumb_of(variant.get("image"))])
+                             thumb_of(variant.get("image"))])
         w = was.get((norm(r["brand"]), norm(r["type"]), norm(r["stage"])))
         events = []
         for event in history.get((r["brand"], r["type"], r["stage"]), []):
@@ -99,9 +99,12 @@ def pack(doc):
                 continue
             events.append([event["observed"], event["field"], event.get("from"),
                            event.get("to"), format(1 << ti[event["territory"]], "x")])
+        # Records are packed positionally; the column order is named once, in
+        # the payload-column census in scripts/test_browser.mjs, which fails if
+        # the page stops reading any column. Nothing is packed here that the
+        # page does not read -- adding a column means driving it in that census.
         rows.append([bi[r["brand"]], r["type"], r["stage"], r["setting"],
-                     format(mask, "x"), r["upc"], r.get("alt_setting"),
-                     r.get("image_date"), w,
+                     format(mask, "x"), r["upc"], r.get("alt_setting"), w,
                      thumb_of(r.get("image")), variants or None, events or None])
     unavailable_rows = []
     for r in unavailable:
@@ -119,6 +122,61 @@ def pack(doc):
     return {"T": terrs, "B": brands, "R": rows, "U": unavailable_rows,
             "M": {"label": doc["label"], "counts": doc["counts"],
                   "generated": doc["generated"], "observed": doc.get("observed")}}
+
+
+def hero_mark(rows, unit=20):
+    """The header mark, drawn from the settings actually in this snapshot.
+
+    Ten petals, one per dial position; a petal's angular spread is that
+    position's share of the records, so the mark leans the way the data does.
+    It is regenerated on every build for the same reason the counts are: a
+    frozen mark would keep describing a distribution the crawl had moved on
+    from. One stroke per ``unit`` records, emitted as one path per position so
+    the whole mark costs a few kB rather than a few hundred <line> elements.
+
+    Decorative only -- it is aria-hidden, and the petal widths say which
+    settings are common, never which setting anyone should use.
+    """
+    import collections, math
+    dist = collections.Counter(r[3] for r in rows)
+    live = {s: dist.get(s, 0) for s in range(1, 11)}
+    top = max(live.values()) or 1
+    mode = max(live, key=lambda s: live[s])
+
+    def pol(radius, deg):
+        a = math.radians(deg - 90)
+        return 50 + radius * math.cos(a), 50 + radius * math.sin(a)
+
+    out = ['<svg class="heromark" viewBox="0 0 100 100" aria-hidden="true">'
+           '<circle cx="50" cy="50" r="46" fill="none" stroke="var(--dial)"'
+           ' stroke-width="1.4" opacity=".35"/>']
+    for s in range(1, 11):
+        n = live[s]
+        if not n:
+            continue
+        share = n / top
+        strokes = max(1, round(n / unit))
+        spread = 13 * share ** 0.45
+        d = []
+        for i in range(strokes):
+            off = (i / (strokes - 1) - 0.5) if strokes > 1 else 0.0
+            deg = s * 36 + off * 2 * spread
+            x1, y1 = pol(21, deg)
+            x2, y2 = pol(44 - abs(off) * 7, deg)
+            d.append(f"M{x1:.1f} {y1:.1f}L{x2:.1f} {y2:.1f}")
+        out.append(f'<path d="{"".join(d)}" stroke="var(--dial)" stroke-width="1.15"'
+                   f' stroke-linecap="round" opacity=".62" fill="none"'
+                   f' data-setting="{s}" data-records="{n}"/>')
+    out.append('<circle cx="50" cy="50" r="17" fill="var(--dial-soft)"'
+               ' stroke="var(--dial)" stroke-width="2.6"/>')
+    # stop short of the rim: half the 4.4 stroke plus its round cap would
+    # otherwise punch through the r=46 ring, the same overshoot the row dial had
+    x1, y1 = pol(18, mode * 36)
+    x2, y2 = pol(42.4, mode * 36)
+    out.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}"'
+               ' stroke="var(--needle)" stroke-width="4.4" stroke-linecap="round"/>')
+    out.append('<circle cx="50" cy="50" r="4" fill="var(--needle)"/></svg>')
+    return "".join(out)
 
 
 TEMPLATE = r"""<meta charset="utf-8">
@@ -147,7 +205,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
   color-scheme:light;
   --ground:#f2f0ec; --surface:#fffefc; --raised:#e9e6e0;
   --thumb-bg:#fff;  /* deliberately the same in dark: photos keep a photo-white frame */
-  --ink:#1c2329; --ink-2:#4c565e; --ink-3:#7b858d;
+  --ink:#1c2329; --ink-2:#4c565e; --ink-3:#5e6870;
   --line:#dbd7d0; --line-2:#c9c4bb;
   --accent:#0f6d72; --accent-soft:#d9e8e7; --accent-ink:#0a4a4e;
   --dial:#c9821a; --dial-ink:#5a3a08; --dial-soft:#f6e6cd; --needle:#5a3a08;
@@ -159,7 +217,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
   :root:not([data-theme="light"]){
     color-scheme:dark;
     --ground:#191410; --surface:#221c15; --raised:#2c241a;
-    --ink:#ede6da; --ink-2:#b3a996; --ink-3:#8f877a;
+    --ink:#ede6da; --ink-2:#b3a996; --ink-3:#938b7e;
     --line:#332b20; --line-2:#46392a;
     --accent:#5fc8c8; --accent-soft:#1b3531; --accent-ink:#9fe0df;
     --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#403012; --needle:#ede6da;
@@ -171,7 +229,7 @@ if(_t==="dark"||_t==="light")document.documentElement.dataset.theme=_t}catch(e){
 :root[data-theme="dark"]{
   color-scheme:dark;
   --ground:#191410; --surface:#221c15; --raised:#2c241a;
-  --ink:#ede6da; --ink-2:#b3a996; --ink-3:#8f877a;
+  --ink:#ede6da; --ink-2:#b3a996; --ink-3:#938b7e;
   --line:#332b20; --line-2:#46392a;
   --accent:#5fc8c8; --accent-soft:#1b3531; --accent-ink:#9fe0df;
   --dial:#e8a94a; --dial-ink:#f6dcae; --dial-soft:#403012; --needle:#ede6da;
@@ -203,8 +261,19 @@ header{padding:32px 0 18px}
   letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
   margin-top:12px;
 }
-.hgrid{display:grid; grid-template-columns:1fr auto; gap:26px; align-items:center}
-.heromark{width:104px; height:104px; margin-top:6px}
+/* The mark sits beside the heading, not above it. The grid is gated at 900px
+   because the h1 is 672px wide in an 820px column: 148px of slack at 900+ but
+   only 56px at 768, which is what made the old ungated two-column header wrap
+   the heading. Below the gate it stacks and the h1 keeps its line. */
+.hrow{display:grid; grid-template-columns:1fr auto; gap:30px; align-items:center; margin-top:10px}
+.hcol{min-width:0}
+.hrow h1{margin:0}
+.lede{margin:12px 0 0; max-width:48ch; font-size:17px; line-height:1.5; color:var(--ink-2)}
+.heromark{display:block; width:104px; height:104px; margin:0}
+@media (max-width:899px){
+  .hrow{display:block}
+  .heromark{margin:16px 0 2px}
+}
 .theme{
   font:inherit; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10px;
   letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2); cursor:pointer;
@@ -266,6 +335,14 @@ footer a{color:var(--ink-2)}
   border-color:var(--focus); box-shadow:0 0 0 3px var(--accent-soft);
 }
 .field input:focus-visible,.terr input:focus-visible{outline:none}
+/* forced-colors drops box-shadow and border-color, so the shell ring above is
+   invisible there. Restore a real outline on the control itself -- outline is
+   the one focus affordance forced-colors honours. */
+@media (forced-colors: active){
+  .field input:focus-visible,.terr input:focus-visible{
+    outline:2px solid Highlight; outline-offset:2px;
+  }
+}
 .field svg{flex:none; width:17px; height:17px; color:var(--ink-3)}
 input,select{
   font:inherit; color:var(--ink); background:transparent; border:0; outline:0;
@@ -315,10 +392,15 @@ input::placeholder{color:var(--ink-3)}
 .scanstate:empty{display:none}
 .lotrow{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .lotrow[hidden]{display:none}
-.lotfield{margin-top:10px;max-width:360px}
+/* flex:1 lets the field reach the max-width it declares; sized to its content
+   it collapsed to 152px, too narrow for the placeholder to render whole. */
+.lotfield{margin-top:10px;max-width:360px;flex:1 1 auto}
 .lotfield input{cursor:text; text-transform:uppercase}
+/* uppercase normalises what the owner types; the placeholder is authored copy
+   and is not a lot number, so it keeps its own case. */
+.lotfield input::placeholder{text-transform:none}
 .lotstate{font-size:13px; color:var(--ink-3)}
-.lotstate.on{
+.lotstate.on,.lotstate.need{
   font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.08em;
   text-transform:uppercase; color:var(--dial-ink); background:var(--dial-soft);
   border:1px solid var(--dial); padding:3px 8px; border-radius:5px;
@@ -355,6 +437,8 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   border-radius:12px; padding:14px 16px; box-shadow:var(--shadow);
 }
 .rec.result{border:2px solid var(--dial);padding:19px 20px;background:linear-gradient(110deg,var(--surface),color-mix(in srgb,var(--dial-soft) 35%,var(--surface)))}
+/* dashed while the page is still asking: the frame itself is unfinished */
+.rec.result.asking{border-style:dashed}
 .resultdial{display:flex;flex-direction:column;align-items:center;gap:4px}
 .resultlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--dial-ink);font-weight:600}
 .rec.result .dialsvg{width:104px;height:104px}
@@ -398,10 +482,16 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   color:var(--stop-ink); background:var(--stop-soft); border:1px solid var(--stop);
   padding:2px 7px; border-radius:5px;
 }
-.alt{
+/* The amber ask: answerable, one fact short. Never the red of .nope and
+   .warning, which both mean do not use this. */
+.ask{
   font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em;
   color:var(--dial-ink); background:var(--dial-soft); border:1px solid var(--dial);
   padding:2px 7px; border-radius:5px;
+}
+.asklot{
+  color:var(--dial-ink); background:var(--dial-soft); border-left:3px solid var(--dial);
+  border-radius:5px; padding:7px 9px; margin:8px 0 0; font-size:13px;
 }
 .where{color:var(--ink-3)}
 .upc{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3);
@@ -495,13 +585,14 @@ footer{
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){
+  .heromark{width:96px;height:96px;margin:12px 0 0}
+  .lede{font-size:16px}
   .controls{padding:15px}.lookuphead{display:block}.privacytag{display:inline-block;margin-top:9px}.setupgrid{grid-template-columns:1fr}.step.searchstep{grid-column:auto}.machinechoices{grid-template-columns:1fr 1fr}
   .field .tag{display:none}.field .scan{font-size:0;padding:7px}.field .scan svg{width:17px;height:17px}
   .rec{gap:13px; padding:12px 13px}
   .dialsvg{width:52px; height:52px}
   .thumb{width:44px; height:44px}
   .imagewrap{width:44px;height:44px}.imagewrap .imagepreview{display:none!important}.rec.result{grid-template-columns:1fr;text-align:center}.rec.result.hasimg{grid-template-columns:1fr}.rec.result .imagewrap,.rec.result .thumb{width:68px;height:68px}.rec.result .imagewrap{margin:4px auto 0}.rec.result .meta{justify-content:center}.rec.result .dialsvg{width:96px;height:96px}
-  .heromark{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -515,9 +606,13 @@ footer{
             title="Switch between automatic, dark, and light"></button>
   </div>
   <div class="eyebrow">Unofficial &mdash; not affiliated with Baby Brezza</div>
-  <div class="hgrid">
-    <h1>What setting does this formula need?</h1>
-    <svg class="heromark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--dial)" stroke-width="2"></circle><g stroke="var(--dial)" stroke-width="2" stroke-linecap="round"><line x1="50" y1="10" x2="50" y2="16"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(36 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(72 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(108 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(144 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(180 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(252 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(288 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(324 50 50)"></line><line x1="50" y1="10" x2="50" y2="16" transform="rotate(216 50 50)"></line></g><circle cx="50" cy="50" r="26" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="2.8"></circle><line x1="50" y1="50" x2="50" y2="29" stroke="var(--needle)" stroke-width="3.2" stroke-linecap="round" transform="rotate(216 50 50)"></line><circle cx="50" cy="50" r="4" fill="var(--needle)"></circle></svg>
+  <div class="hrow">
+    <div class="hcol">
+      <h1>What setting does this formula need?</h1>
+      <p class="lede">Every powder setting Baby Brezza publishes, searchable in your
+      browser &mdash; no email address, no lookup limit, and nothing you type leaves the tab.</p>
+    </div>
+    __HERO_MARK__
   </div>
 </header>
 
@@ -541,7 +636,7 @@ footer{
         <div class="terr lotfield">
           <label for="lot">Lot no.</label>
           <input id="lot" type="text" maxlength="14" autocomplete="off" spellcheck="false"
-                 placeholder="optional · sticker underneath" aria-label="Machine lot number">
+                 placeholder="sticker underneath" aria-label="Machine lot number">
         </div>
         <span class="lotstate" id="lotstate"></span>
       </div>
@@ -757,7 +852,25 @@ function fmtFullDate(iso){
 
 // Baby Brezza reads the machine's lot number and switches to a second set of
 // settings when it starts with 11. Their own field is uppercased, max 14.
-const lotIsAlt = () => $lot.value.trim().toUpperCase().startsWith("11");
+// Three states, not two: an empty field on an Advanced machine is UNKNOWN,
+// which is a different claim from "this is not a lot-11 machine". Mini never
+// reads the lot at all, so for it the standard settings are simply the answer.
+const LOT = {UNKNOWN:"unknown", ALT:"alt", STANDARD:"standard"};
+function lotState(){
+  if (machine !== "advanced") return LOT.STANDARD;
+  const raw = $lot.value.trim().toUpperCase();
+  if (!raw) return LOT.UNKNOWN;
+  return raw.startsWith("11") ? LOT.ALT : LOT.STANDARD;
+}
+// The number this record answers with on a machine in a given lot state.
+const settingFor = (r, state) => state === LOT.ALT && r[6] != null ? r[6] : r[3];
+// A location claim, not a verdict: this record's number depends on a lot the
+// page has not been given. It says nothing about whether the standard number
+// is safe -- only that the answer is unresolved here. True only where the
+// alternate would actually change the answer, so a record without one, or one
+// whose alternate matches its standard, is never gated.
+const lotUndecided = r =>
+  lotState() === LOT.UNKNOWN && settingFor(r, LOT.ALT) !== settingFor(r, LOT.STANDARD);
 
 const store = {
   get(k,d){ try{ return localStorage.getItem(k) ?? d }catch(e){ return d } },
@@ -802,7 +915,7 @@ $theme.addEventListener("click", () => {
 function renderStrip(){
   const c = D.M.counts;
   const machineNote = machine === "advanced"
-    ? "Advanced / WiFi selected &middot; enter a lot number only if it begins with 11."
+    ? "Advanced / WiFi selected &middot; a few formulas need the machine's lot number before a setting."
     : machine === "mini"
       ? "Mini selected &middot; Mini always uses the standard setting; no lot number needed."
       : "Choose your machine before looking up a setting.";
@@ -817,8 +930,15 @@ function applyMachine(){
   // Advanced and Advanced WiFi machines; Mini never takes this branch.
   $lotrow.hidden = machine !== "advanced";
   $scan.hidden = !machine || !canScan;
-  syncLot();
-  $q.placeholder = "Enfamil NeuroPro, Kirkland, 070074680644…";
+  // Examples, not categories: step 3's own label already reads "Brand, formula
+  // name, or barcode", and the brand chips below the field name brands again.
+  // A literal barcode is the one thing nothing else on the page demonstrates,
+  // so the budget buys one brand plus real digits -- that is what teaches a
+  // parent they may type twelve digits into a search box at all. 165.2px into
+  // the 188px this field has at the 390px floor; it also clears 375px, though
+  // the floor stays 390 because the lot placeholder does not. The old copy
+  // needed 299.5px and was clipped mid-barcode on every phone.
+  $q.placeholder = "Similac or 070074680644";
   const prev = store.get("brezza.terr", "");
   $territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
   $terr.value = D.T.includes(prev) ? prev : "";
@@ -892,19 +1012,19 @@ function search(){
 
 function selectedVariant(r){
   const ti = D.T.indexOf(market());
-  if (ti < 0 || !r[10]) return null;
+  if (ti < 0 || !r[9]) return null;
   const bit = 1n << BigInt(ti);
-  return r[10].find(v => (BigInt("0x" + v[0]) & bit) !== 0n) || null;
+  return r[9].find(v => (BigInt("0x" + v[0]) & bit) !== 0n) || null;
 }
 function rowUpcs(r){
-  if (!market() || !r[10]) return r[5];
+  if (!market() || !r[9]) return r[5];
   const variant = selectedVariant(r);
   return variant ? variant[1] : [];
 }
 function rowThumb(r){
-  if (!market() || !r[10]) return r[9];
+  if (!market() || !r[9]) return r[8];
   const variant = selectedVariant(r);
-  return variant ? variant[3] : null;
+  return variant ? variant[2] : null;
 }
 function mark(text, terms){
   if (!terms.length) return esc(text);
@@ -958,17 +1078,28 @@ function stopSVG(setting){
   const zero = setting === 0;
   return `<svg class="dialsvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--stop)" stroke-width="2"/><g stroke="var(--stop)" stroke-width="2" stroke-linecap="round">${ticksSVG(-1)}</g><circle cx="50" cy="50" r="26" fill="var(--stop-soft)" stroke="var(--stop)" stroke-width="2.8"/><text x="50" y="${zero ? 60 : 61}" text-anchor="middle" font-size="${zero ? 30 : 34}" font-weight="600" fill="var(--stop-ink)">${zero ? "0" : "&times;"}</text></svg>`;
 }
+// The lot-gated face. Every tick is still in play and there is no needle,
+// because the position is undecided rather than refused; the dashed core says
+// the same. Amber, never the red the two stop faces use -- those mean do not
+// use this, and this one means the page can answer once you tell it one more
+// thing.
+function askSVG(){
+  return `<svg class="dialsvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--dial)" stroke-width="2"/><g stroke="var(--dial)" stroke-width="2" stroke-linecap="round">${ticksSVG(-1)}</g><circle cx="50" cy="50" r="26" fill="var(--dial-soft)" stroke="var(--dial)" stroke-width="2.8" stroke-dasharray="5 4.5"/><text x="50" y="61" text-anchor="middle" font-size="32" font-weight="600" fill="var(--dial-ink)">?</text></svg>`;
+}
 function unavailableCard(i){
   const r = U[i], label = D.B[r[0]] + " · " + r[1], thumb = productImage(r[6], label);
   const where = countryLabel(UMASK[i]);
+  // The lead states what both reasons share. The detail carries only what
+  // separates them: no_stage has a why worth naming, no_setting has none --
+  // Baby Brezza simply publishes no number -- so it adds nothing.
   const detail = r[4] === "no_stage"
-    ? "Baby Brezza lists the product but does not provide the stage its finder requires."
-    : "Baby Brezza lists the product but returns no setting for it.";
+    ? " Its finder needs a stage this product record does not carry."
+    : "";
   return `<li class="rec${thumb ? " hasimg" : ""}">
     ${stopSVG(null)}
     <div><p class="name">${esc(label)}</p>
       <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}<span class="where">${esc(where)}</span></div>
-      <p class="warning"><strong>Baby Brezza lists this formula but publishes no usable setting.</strong> ${detail} Do not use it in the machine unless Baby Brezza confirms compatibility and the correct setting.</p>
+      <p class="warning"><strong>Baby Brezza lists this formula but publishes no usable setting.</strong>${detail} Do not use it in the machine unless Baby Brezza confirms compatibility and the correct setting.</p>
     </div>${thumb}</li>`;
 }
 
@@ -982,9 +1113,9 @@ function choiceCard(i, terms){
 
 function historyMarkup(r){
   const ti = D.T.indexOf(market());
-  if (ti < 0 || !r[11]) return "";
+  if (ti < 0 || !r[10]) return "";
   const bit = 1n << BigInt(ti);
-  const events = r[11].filter(event => (BigInt("0x" + event[4]) & bit) !== 0n);
+  const events = r[10].filter(event => (BigInt("0x" + event[4]) & bit) !== 0n);
   if (!events.length) return "";
   const rows = events.map(event => {
     const label = event[1] === "alt_setting" ? "Lot 11 setting" : "Standard setting";
@@ -998,27 +1129,39 @@ function historyMarkup(r){
 function resultCard(i, terms){
   const r = D.R[i], standard = r[3], altSetting = r[6];
   // A lot-11 Advanced takes the alternate number. Mini never takes this branch.
-  const useAlt = machine === "advanced" && altSetting != null && lotIsAlt();
-  const setting = useAlt ? altSetting : standard;
-  const num = typeof setting === "number" && setting > 0;
+  const state = lotState();
+  // Undecided outranks everything below: with the lot unknown this record has
+  // no single number, so nothing here may render one.
+  const undecided = lotUndecided(r);
+  const setting = settingFor(r, state);
+  const num = !undecided && typeof setting === "number" && setting > 0;
   const where = `<span class="where">${esc(market() || countryLabel(MASK[i]))}</span>`;
-  const altChip = machine !== "advanced" || altSetting == null ? ""
-    : useAlt
+  // Once the lot is known, the other kind of machine's number is a footnote
+  // rather than a caveat, so both directions read the same way -- and neither
+  // hides in a title tooltip, which does not exist on touch.
+  const otherChip = machine !== "advanced" || undecided || altSetting == null || altSetting === standard ? ""
+    : state === LOT.ALT
       ? `<span class="std">Standard machine: ${standard}</span>`
-      : `<span class="alt" title="Formula Pro Advanced and Advanced WiFi units whose lot number starts with 11 use this alternate. Mini never uses it.">Lot 11… → ${altSetting}</span>`;
-  const was = r[8] ? `<span class="was" title="This record's setting in a frozen copy of Baby Brezza's own data from around 2022 — evidence the number moves, not an official change log.">was <s>${esc(r[8])}</s></span>` : "";
+      : `<span class="std">Lot 11 machines: ${altSetting}</span>`;
+  const was = r[7] && !undecided ? `<span class="was" title="This record's setting in a frozen copy of Baby Brezza's own data from around 2022 — evidence the number moves, not an official change log.">was <s>${esc(r[7])}</s></span>` : "";
   const label = D.B[r[0]] + " · " + r[1];
   const thumb = productImage(rowThumb(r), label);
-  const nope = num ? `<span class="sr">Setting ${setting}</span>`
+  const nope = undecided ? `<span class="ask">Lot number needed</span>`
+    : num ? `<span class="sr">Setting ${setting}</span>`
     : setting === 0
       ? `<span class="nope" title="Baby Brezza publishes 0 for this formula. Because the dial runs 1–10, do not use it without confirming compatibility and the correct setting.">No dial position</span>`
       : `<span class="nope">${esc(setting)}</span>`;
+  const asklot = undecided
+    ? `<p class="asklot"><strong>This formula’s setting depends on your machine’s lot number.</strong> Formula Pro Advanced and Advanced WiFi units whose lot number starts with 11 take a different number for it. Check the sticker underneath the machine and enter the lot number in step 1.</p>`
+    : "";
   const observed = D.M.observed ? `<p class="observed">Last checked against Baby Brezza’s data on ${fmtFullDate(D.M.observed)}.</p>` : "";
-  const history = historyMarkup(r);
-  return `<li class="rec result${thumb ? " hasimg" : ""}">
-    <div class="resultdial"><span class="resultlabel">Your setting</span>${num ? dialSVG(setting) : stopSVG(setting)}</div>
+  // A history row names the standard setting outright ("Standard setting:
+  // 4 → 5"), so it is withheld with the number itself, like the `was` chip.
+  const history = undecided ? "" : historyMarkup(r);
+  return `<li class="rec result${undecided ? " asking" : ""}${thumb ? " hasimg" : ""}">
+    <div class="resultdial"><span class="resultlabel">${undecided ? "Needs lot no." : "Your setting"}</span>${undecided ? askSVG() : num ? dialSVG(setting) : stopSVG(setting)}</div>
     <div><p class="name">${mark(label, terms)}</p>
-      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${altChip}${was}${where}</div>${observed}${history}
+      <div class="meta">${r[2] ? `<span class="stage">Stage ${esc(r[2])}</span>` : ""}${nope}${otherChip}${was}${where}</div>${asklot}${observed}${history}
     </div>${thumb}</li>`;
 }
 
@@ -1030,32 +1173,55 @@ function productImage(name, label, interactive=true){
   return `<span class="imagewrap"${attrs}><img class="thumb" src="thumbs/${escAttr(name)}.webp" loading="lazy" decoding="async" alt=""><img class="imagepreview" src="thumbs/${escAttr(name)}.webp" loading="lazy" decoding="async" alt=""></span>`;
 }
 
-function updateSteps(raw){
+// The one record this lookup has landed on, or null while anything is still
+// unresolved. Rows Baby Brezza lists without a usable setting count as
+// candidates: a same-named sibling is another thing the container might be,
+// and it cannot sit unresolved under a number called an exact match.
+function resolveHit(hits, unavailable){
+  if (!market() || !hits.length) return null;
+  if (chosen != null) return chosen;
+  return hits.length + unavailable.length === 1 ? hits[0] : null;
+}
+
+// A step is done when it has resolved, never merely because it was touched --
+// on a page whose thesis is "no number until all three resolve", a green tick
+// on an unresolved step says the opposite. `needs` marks the one step now
+// blocking an answer, so the amber points where the work is.
+function updateSteps(raw, resolved){
   const selectedMarket = market();
   const invalidMarket = $terr.value.trim() && !selectedMarket;
-  $machineStep.classList.toggle("done", !!machine);
-  $machineStep.classList.toggle("needs", !machine);
+  // The lot is a gate only on the record actually resolved, and only where the
+  // alternate would change its number; everywhere else it stays optional.
+  const lotBlocked = resolved != null && lotUndecided(D.R[resolved]);
+  $machineStep.classList.toggle("done", !!machine && !lotBlocked);
+  $machineStep.classList.toggle("needs", !machine || lotBlocked);
   $marketStep.classList.toggle("done", !!selectedMarket);
   $marketStep.classList.toggle("needs", !!machine && !selectedMarket);
-  $searchStep.classList.toggle("done", !!raw);
-  $searchStep.classList.toggle("needs", !!machine && !!selectedMarket && !raw);
-  $machineStatus.textContent = machine === "advanced" ? "Advanced / WiFi" : machine === "mini" ? "Mini" : "Required";
+  $searchStep.classList.toggle("done", resolved != null);
+  $searchStep.classList.toggle("needs", !!machine && !!selectedMarket && !lotBlocked && resolved == null);
+  $machineStatus.textContent = lotBlocked ? "Lot number needed"
+    : machine === "advanced" ? "Advanced / WiFi" : machine === "mini" ? "Mini" : "Required";
   $marketStatus.textContent = selectedMarket ? selectedMarket : invalidMarket ? "Choose a listed market" : "Required for a setting";
-  $searchStatus.textContent = raw ? "Searching formulas" : "Brand, formula name, or barcode";
+  $searchStatus.textContent = resolved != null ? "Formula chosen" : raw ? "Searching formulas" : "Brand, formula name, or barcode";
+  syncLot(lotBlocked);
 }
 
 function run(){
   const raw = $q.value.trim();
+  normalizeLot();
   tabStore.set("brezza.q", raw);
   if (market()) store.set("brezza.terr", market());
   else if (!$terr.value.trim()) store.remove("brezza.terr");
-  updateSteps(raw);
   if (!machine){
+    updateSteps(raw, null);
     $mode.hidden = true; $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
     $empty.innerHTML = "<p>Start by choosing your machine. Lot numbers beginning with 11 can change settings on Advanced and Advanced WiFi machines; Mini uses the standard setting.</p>";
     return;
   }
   const {mode, hits, unavailable} = search();
+  if (!hits.includes(chosen)) chosen = null;
+  const resolved = resolveHit(hits, unavailable);
+  updateSteps(raw, resolved);
   $mode.hidden = mode !== "barcode";
 
   if (!raw){
@@ -1084,24 +1250,37 @@ function run(){
   // rows can disagree. Never turn it into a dial instruction: require the
   // market selector before rendering any actionable result, even for one hit.
   if (!market()){
-    $count.textContent = `${hits.length} possible ${hits.length === 1 ? "match" : "matches"} — choose where the formula was sold`;
+    $count.textContent = `${hits.length} possible ${hits.length === 1 ? "match" : "matches"}`;
     $out.innerHTML = `<li class="choicehead"><h2>Step 2: choose where it was sold</h2><p>Search for or choose a market before using a dial setting. The same formula name or barcode can point to different products in different markets.</p></li>` +
       hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("");
     return;
   }
-  if (!hits.includes(chosen)) chosen = null;
-  if (hits.length > 1 && chosen == null){
-    $count.textContent = `${hits.length} possible matches — choose the exact formula`;
+  if (resolved == null){
+    $count.textContent = `${hits.length + unavailable.length} possible matches`;
     const warning = mode === "barcode"
       ? "More than one product or setting uses this barcode. Do not use a dial setting until you choose the matching formula and market."
       : "Several products match this search. Choose the exact formula before using a dial setting.";
-    $out.innerHTML = `<li class="choicehead"><h2>Step 4: which formula matches your container?</h2><p>${warning}</p></li>` +
-      hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("");
+    // An unavailable row is not a choosable setting, so it is never a choice
+    // card -- picking it could only promise a number Baby Brezza never
+    // published. It counts as a candidate and is listed below as context, and
+    // its own card already says what to do if that is the tin in hand.
+    const alsoUnavailable = unavailable.length
+      ? ` ${unavailable.length === 1 ? "One match has" : `${unavailable.length} matches have`} no published setting; ${unavailable.length === 1 ? "it is" : "they are"} listed below without a number.`
+      : "";
+    $out.innerHTML = `<li class="choicehead"><h2>Step 4: which formula matches your container?</h2><p>${warning}${alsoUnavailable}</p></li>` +
+      hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("") +
+      unavailable.slice(0, MAX).map(unavailableCard).join("");
     return;
   }
-  const i = chosen == null ? hits[0] : chosen;
+  const i = resolved;
   const resultChanged = shownResult !== i;
-  $count.textContent = "Exact formula match" + (unavailable.length ? " — related formulas without a published setting are listed below" : "");
+  // one dash-joined line, so a gated result that also has unresolved siblings
+  // does not read as two sentences sharing a dash
+  const notes = ["Exact formula match"];
+  if (lotUndecided(D.R[i])) notes.push("setting depends on your lot number");
+  if (unavailable.length) notes.push(
+    `${unavailable.length} related formula${unavailable.length === 1 ? "" : "s"} without a published setting`);
+  $count.textContent = notes.join(" — ");
   $out.innerHTML = resultCard(i, terms) + unavailable.map(unavailableCard).join("");
   shownResult = i;
   if (resultChanged) requestAnimationFrame(() => $out.firstElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"}));
@@ -1116,18 +1295,34 @@ el("foot").innerHTML =
   `built because a safety lookup should not require an email address. All settings ` +
   `come from Baby Brezza's public data. __FOOT_SOURCE_LINKS__</p>`;
 
-function syncLot(){
+// Baby Brezza's own field uppercases what is typed; do the same before any
+// state is read off it.
+function normalizeLot(){
   const raw = $lot.value.trim().toUpperCase();
   if ($lot.value !== raw) $lot.value = raw;
   tabStore.set("brezza.lot", raw);
-  if (machine !== "advanced" || !raw){
+}
+
+// The caption states what the field is doing right now. It cannot call the lot
+// optional in general any more: for the formulas that carry an alternate it is
+// required, so an empty field reads as "not yet needed" until a resolved
+// record needs it, and as the blocker once one does.
+function syncLot(blocking){
+  if (machine !== "advanced"){
     $lotstate.className = "lotstate";
-    $lotstate.textContent = machine === "advanced"
-      ? "Optional — only lot numbers starting 11 change any setting."
-      : "";
+    $lotstate.textContent = "";
     return;
   }
-  if (lotIsAlt()){
+  if (blocking){
+    $lotstate.className = "lotstate need";
+    $lotstate.textContent = "Needed for this formula";
+    return;
+  }
+  const state = lotState();
+  if (state === LOT.UNKNOWN){
+    $lotstate.className = "lotstate";
+    $lotstate.textContent = "Some formulas need it — the page asks when yours does.";
+  } else if (state === LOT.ALT){
     $lotstate.className = "lotstate on";
     $lotstate.textContent = `Lot 11 — showing the alternate settings`;
   } else {
@@ -1136,7 +1331,7 @@ function syncLot(){
   }
 }
 
-$lot.addEventListener("input", () => { syncLot(); run() });
+$lot.addEventListener("input", run);
 document.querySelectorAll("[data-machine]").forEach(button => button.addEventListener("click", () => {
   $machine.value = button.dataset.machine;
   $machine.dispatchEvent(new Event("change", {bubbles:true}));
@@ -1329,13 +1524,14 @@ def main():
     html = (TEMPLATE
             .replace("__DATA__", json.dumps(packed, ensure_ascii=False, separators=(",", ":")))
             .replace("__QUICK__", json.dumps(quick, ensure_ascii=False))
+            .replace("__HERO_MARK__", hero_mark(packed["R"]))
             .replace("__SOURCE_LINKS__", source_links)
             .replace("__FOOT_SOURCE_LINKS__", foot_source_links))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         f.write(html)
-    nwas = sum(1 for r in packed["R"] if r[8])
-    nthumb = sum(1 for r in packed["R"] if r[9])
+    nwas = sum(1 for r in packed["R"] if r[7])
+    nthumb = sum(1 for r in packed["R"] if r[8])
     print(f"wrote {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB), "
           f"{len(packed['R'])} current Advanced-family records, {len(packed['B'])} brands, "
           f"{nwas} rows carry a 'was' chip (staleness examples: 59), "

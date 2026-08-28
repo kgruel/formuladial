@@ -101,9 +101,15 @@ machine; the field is uppercased and capped at 14 characters.
     Parent's Choice Sensitivity    5 -> 6      Bobbie Organic +DHA ARA   4 -> 6
 
 Usually +1 or +2, occasionally lower (Wellsley Farms Infant Premium 7 -> 5,
-HiPP HA2 Combiotik 4 -> 3), twice a drop to 0. The page takes a lot number and
-shows the alternate as the main number with the standard one beside it;
-`lookup.py --lot 11X` does the same.
+HiPP HA2 Combiotik 4 -> 3), twice a drop to 0. Because the alternate differs in
+every one of the 99, an Advanced machine whose lot number is unknown has two
+answers for those formulas and no way to choose between them. So on exactly
+those records the lot is a fourth gate: the page shows no dial number until it
+is entered, then shows the single right one with the other machine's number as
+a footnote beside it. `lookup.py` holds the same boundary — without `--lot`
+such a lookup is `ambiguous` and its setting is withheld, and `--lot 11X`
+resolves it. Everywhere else the lot changes nothing and stays optional, and
+the Mini never reads it at all.
 
 ## Dating and observing the data
 

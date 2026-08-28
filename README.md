@@ -13,10 +13,11 @@ Two things to know before you trust any number, from here or anywhere:
   brand name can differ by stage, market, and even your machine's lot number.
   If what the tin says and what the finder says disagree, believe neither —
   ask Baby Brezza.
-* **"Dated" means "not touched since", never "verified on".** The dates shown
-  come from when Baby Brezza last replaced a record's product image. A record
-  dated 2023 may have had its setting revised since without the picture
-  changing. They are a freshness hint, not a verification stamp.
+* **The one date the finder shows is when the data was last checked.** It is
+  bound to the hash of a complete crawl, so it says what it means. The
+  dataset's own `image_date` is a different and weaker claim — when Baby
+  Brezza last replaced a record's product image, "not touched since" rather
+  than "verified on" — so the page does not carry it at all.
 
 This site is **unofficial and not affiliated with Baby Brezza**. Every number
 comes from Baby Brezza's own public data, collected as described in
@@ -51,11 +52,12 @@ what is and isn't consent-gated — are in
   change log or notice. Compared against a frozen ~2022 copy of their own data,
   59 of 276 unambiguous settings had changed — those results carry a struck-out
   "was" chip on the page.
-* **Lot-11 alternates.** Advanced and Advanced WiFi machines whose lot number
-  (sticker underneath) starts with 11 use different numbers for 99 formulas —
-  including Similac 360, Enfamil NeuroPro Gentlease, and Kirkland ProCare.
-  Enter your lot number and the page shows the right one. The Mini never uses
-  these.
+* **Lot-11 alternates, asked for rather than whispered.** Advanced and Advanced
+  WiFi machines whose lot number (sticker underneath) starts with 11 use
+  different numbers for 99 formulas — including Similac 360, Enfamil NeuroPro
+  Gentlease, and Kirkland ProCare. On those 99 the lot number is a fourth gate:
+  the page shows no dial number until you enter it, then shows the one right
+  number. Everywhere else it stays optional, and the Mini never uses it.
 
 The discontinued original Formula Pro is intentionally not part of the app.
 Its frozen raw data remains under `data/legacy/` as a historical research
@@ -67,14 +69,17 @@ Details are in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
 If you have the repo checked out:
 
     ./lookup.py similac 360                    # the Advanced line — the default
-    ./lookup.py similac 360 --lot 1123ABC      # numbers for a lot-11 Advanced
+    ./lookup.py similac 360 --lot 1123ABC      # required where a formula has
+                                               # an alternate; 11… selects it
     ./lookup.py --upc 070074680644             # barcode (Advanced only)
     ./lookup.py --alt-only enfamil             # only formulas with an alternate
 
 The command-line lookup has the same confidence boundary as the page. A single
-market-specific match is `unique`; a missing `--territory`, several text
-matches, or a barcode mapping to different tins is `ambiguous`, and settings
-are withheld until the lookup is narrowed. A formula that Baby Brezza knows about
+market-specific match with nothing else beside it is `unique`; a missing
+`--territory`, several text matches, a barcode mapping to different tins, a
+formula whose setting depends on a lot number no `--lot` supplied, or a
+same-named row Baby Brezza publishes no setting for is `ambiguous`, and
+settings are withheld until the lookup is narrowed. A formula that Baby Brezza knows about
 but for which it publishes no usable setting is `known_unavailable`; no match
 at all is `not_found`. With `--json`, non-unique and unavailable outcomes use
 an envelope with `state`, `results`, and `unavailable` fields. The original
