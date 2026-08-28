@@ -23,18 +23,10 @@ HISTORY = "data/setting_history.json"
 OUT = "site/index.html"
 
 
-def public_repository_url():
-    """Return the public repository URL when the build environment knows it.
-
-    GitHub Actions provides GITHUB_REPOSITORY automatically. Local preview
-    builds usually do not, so they link to the bundled dataset instead of
-    emitting a dead USER/REPO placeholder.
-    """
-    explicit = os.environ.get("REPOSITORY_URL", "").rstrip("/")
-    if explicit:
-        return explicit
-    slug = os.environ.get("GITHUB_REPOSITORY", "")
-    return f"https://github.com/{slug}" if re.fullmatch(r"[^/]+/[^/]+", slug) else ""
+# The published home of this project. A constant, not an environment sniff:
+# the build must be deterministic -- the same page locally and in CI -- so the
+# committed site/index.html is always exactly what a rebuild produces.
+REPO_URL = "https://github.com/kgruel/formuladial"
 
 
 def thumb_of(image):
@@ -1598,24 +1590,17 @@ def main():
     wanted = ["Enfamil", "Similac", "Kirkland", "Bobbie", "Kendamil", "HiPP", "Holle",
               "ByHeart", "Parent's Choice", "Good Start", "Gerber", "Earth's Best"]
     quick = [b for b in wanted if b in packed["B"]]
-    repo = public_repository_url()
-    if repo:
-        source_links = (
-            f'<a href="{repo}">Browse the source and dataset</a> &middot; '
-            f'<a href="{repo}/blob/main/docs/HOW-IT-WORKS.md">Read how it works</a>. '
-            f'Found a setting that disagrees with your label? '
-            f'<a href="{repo}/issues">Open an issue</a>.'
-        )
-        foot_source_links = (
-            f'<a href="{repo}">Source and dataset</a> &middot; '
-            f'<a href="{repo}/blob/main/docs/HOW-IT-WORKS.md">How it works</a>.'
-        )
-    else:
-        source_links = (
-            '<a href="data/formula_settings.json" download>Download the current dataset</a>. '
-            'Found a setting that disagrees with your label? Confirm it with Baby Brezza.'
-        )
-        foot_source_links = '<a href="data/formula_settings.json" download>Download the current dataset</a>.'
+    repo = REPO_URL
+    source_links = (
+        f'<a href="{repo}">Browse the source and dataset</a> &middot; '
+        f'<a href="{repo}/blob/main/docs/HOW-IT-WORKS.md">Read how it works</a>. '
+        f'Found a setting that disagrees with your label? '
+        f'<a href="{repo}/issues">Open an issue</a>.'
+    )
+    foot_source_links = (
+        f'<a href="{repo}">Source and dataset</a> &middot; '
+        f'<a href="{repo}/blob/main/docs/HOW-IT-WORKS.md">How it works</a>.'
+    )
     html = (TEMPLATE
             .replace("__DATA__", json.dumps(packed, ensure_ascii=False, separators=(",", ":")))
             .replace("__QUICK__", json.dumps(quick, ensure_ascii=False))

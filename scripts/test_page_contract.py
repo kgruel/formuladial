@@ -336,9 +336,10 @@ class PageContractTests(unittest.TestCase):
         # the editorial states the boundary the feature must keep
         self.assertIn("never the\n  setting, which is looked up fresh", self.html)
 
-    def test_local_build_has_no_placeholder_repository_links(self):
+    def test_the_page_links_its_published_repository(self):
         self.assertNotIn("USER/REPO", self.html)
-        self.assertIn('href="data/formula_settings.json"', self.html)
+        self.assertIn('href="https://github.com/kgruel/formuladial"', self.html)
+        self.assertEqual(build_page.REPO_URL, "https://github.com/kgruel/formuladial")
 
     def test_typography_is_self_hosted(self):
         self.assertNotIn("fonts.googleapis.com", self.html)

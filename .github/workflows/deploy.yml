@@ -1,0 +1,38 @@
+name: deploy-pages
+
+# Publish the committed site/ directory as-is. The monthly full crawl also
+# deploys, but only after a *finished* walk; this workflow covers page-only
+# changes -- copy, layout, lookup logic -- that land on main without a
+# re-crawl, and the very first deploy.
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload the site for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
