@@ -4,7 +4,7 @@ A free, searchable page with every powder setting Baby Brezza publishes for
 the Formula Pro Advanced family: Advanced, Advanced WiFi, and Mini. No email
 address, no lookup limit, no tracking. Type a brand, get the number.
 
-**Use it here: https://kgruel.github.io/formuladial/**
+**Use it here: https://formuladial.com/**
 
 Two things to know before you trust any number, from here or anywhere:
 
