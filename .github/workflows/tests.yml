@@ -1,0 +1,57 @@
+name: tests
+
+# The suites were local discipline only: nothing ran them on a push, and a
+# change that deleted a safety rule and rewrote the assertion guarding it could
+# have reached main green. They are cheap and offline -- no crawl, no network --
+# so there is no reason not to run them on every push.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Locate a Chromium
+        run: |
+          for candidate in /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -x "$candidate" ]; then echo "CHROMIUM=$candidate" >> "$GITHUB_ENV"; exit 0; fi
+          done
+          sudo apt-get update && sudo apt-get install -y chromium-browser
+          echo "CHROMIUM=/usr/bin/chromium-browser" >> "$GITHUB_ENV"
+
+      # site/index.html is generated from build_page.py. A hand-edit to the
+      # generated file would otherwise survive until the next rebuild silently
+      # reverted it, so prove here that the committed page is what the builder
+      # actually produces.
+      - name: The committed page is the one the builder produces
+        run: |
+          python3 build_page.py
+          git diff --exit-code -- site/index.html \
+            || { echo "::error::site/index.html differs from build_page.py output — edit the builder, not the page"; exit 1; }
+
+      - name: Offline suites
+        run: |
+          python3 scripts/test_page_contract.py
+          python3 scripts/test_dataset.py
+          python3 scripts/test_lookup.py
+          python3 scripts/test_watch.py
+          python3 scripts/test_crawl_completion.py
+
+      - name: Confidence flow in a real browser
+        run: node scripts/test_browser.mjs

@@ -106,10 +106,22 @@ class DatasetTests(unittest.TestCase):
             self.assertTrue(row["territories"])
             self.assertIn(row["reason"], {"no_stage", "no_match", "no_setting"})
 
-    def test_observation_is_bound_to_the_exact_raw_crawl(self):
+    def test_committed_observation_matches_the_local_crawl(self):
+        """The committed manifest names the crawl that produced the snapshot.
+
+        Only checkable where that crawl is on disk: ``data/raw`` is gitignored,
+        so a fresh clone has nothing to bind against. Skipping says that out
+        loud; failing would claim the code is wrong when only the input is
+        missing, and passing silently would hide that nothing was checked.
+        """
+        raw_path = os.path.join(ROOT, build_dataset.RAW_SETTINGS)
+        if not os.path.exists(raw_path):
+            self.skipTest("data/raw/settings.jsonl is gitignored and absent here")
         with open(os.path.join(ROOT, build_dataset.OBSERVATION)) as source:
             expected = json.load(source)["observed"]
         self.assertEqual(build_dataset.observed_date(), expected)
+
+    def test_observation_is_bound_to_the_exact_raw_crawl(self):
         raw = self.write_rows([{"query": ["US", "A", "B", "1"]}])
         manifest = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
         self.addCleanup(lambda: os.path.exists(manifest.name) and os.unlink(manifest.name))
