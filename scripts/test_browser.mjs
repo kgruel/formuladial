@@ -14,11 +14,15 @@ const chromium = [process.env.CHROMIUM, "/opt/homebrew/bin/chromium",
 if (!chromium) throw new Error("Set CHROMIUM to a Chromium/Chrome executable");
 const profile = mkdtempSync(join(tmpdir(), "brezza-browser-test-"));
 const port = 9300 + (process.pid % 500);
-// A Linux CI runner has no user namespaces to sandbox into, so Chrome exits
-// before it opens the DevTools port -- and this harness spawns it with stdio
-// ignored, so the only symptom is the endpoint never arriving. Kept off local
-// runs, where the sandbox works and should stay on.
+// A CI container has no large /dev/shm and no user namespaces to sandbox into.
+// Neither turned out to be what broke the run, but both are real differences
+// from a laptop and cost nothing to remove as variables. Scoped to CI so local
+// runs keep the sandbox on.
 const ciFlags = process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
+// Chrome's stderr was going to /dev/null, so a browser that died on startup and
+// a browser that was merely slow produced the same symptom: the endpoint never
+// arrives. Keep it, and print it when the wait runs out.
+let chromeErr = "";
 const child = spawn(chromium, [
   "--headless=new",
   "--disable-gpu",
@@ -30,19 +34,29 @@ const child = spawn(chromium, [
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${profile}`,
   pathToFileURL(join(root, "site/index.html")).href,
-], { stdio: "ignore" });
+], { stdio: ["ignore", "ignore", "pipe"] });
+child.stderr.on("data", chunk => { chromeErr += chunk.toString() });
 
 const pause = ms => new Promise(resolvePromise => setTimeout(resolvePromise, ms));
 
+// 80 x 50ms was four seconds, which is generous on a laptop and a coin-flip on
+// a cold CI runner -- the same commit passed once and failed twice on it. This
+// budget is a ceiling, not a delay: the loop returns the moment the port answers.
+const START_BUDGET_MS = Number(process.env.BROWSER_START_BUDGET_MS || 30000);
 async function targets() {
-  for (let tries = 0; tries < 80; tries += 1) {
+  const deadline = Date.now() + START_BUDGET_MS;
+  while (Date.now() < deadline) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json`);
       if (response.ok) return await response.json();
     } catch {}
+    if (child.exitCode !== null) break;
     await pause(50);
   }
-  throw new Error("Chromium DevTools endpoint did not start");
+  throw new Error(
+    `Chromium DevTools endpoint did not start within ${START_BUDGET_MS}ms` +
+    (child.exitCode !== null ? ` (it exited with code ${child.exitCode})` : "") +
+    (chromeErr ? `\n--- chromium stderr ---\n${chromeErr.trim()}` : "\n(chromium printed nothing to stderr)"));
 }
 
 let sequence = 0;
