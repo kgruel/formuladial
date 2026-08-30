@@ -56,7 +56,7 @@ class PageContractTests(unittest.TestCase):
     def test_payload_contains_only_current_records(self):
         packed = build_page.pack(self.current)
         self.assertEqual(len(packed["R"]), self.current["counts"]["records"])
-        self.assertEqual(set(packed), {"T", "B", "R", "U", "M"})
+        self.assertEqual(set(packed), {"T", "B", "A", "R", "U", "M"})
         self.assertEqual(set(packed["M"]), {"label", "counts", "generated", "observed"})
         self.assertTrue(all(len(row) == 11 for row in packed["R"]))
         self.assertEqual(sum(row[9] is not None for row in packed["R"]), 13)
@@ -392,6 +392,103 @@ class PageContractTests(unittest.TestCase):
                      "zilla-slab-700-latin.woff2", "ibm-plex-mono-400-latin.woff2",
                      "ibm-plex-mono-500-latin.woff2", "ibm-plex-mono-600-latin.woff2"):
             self.assertTrue(os.path.exists(os.path.join(ROOT, "site", "fonts", name)), name)
+
+    def test_alias_ratchet_enumerable_properties(self):
+        """The alias table is an enumerable ratchet over data/territory_aliases.json.
+
+        Every alias must fold to exactly one canonical territory, no alias may
+        collide with any canonical territory, no alias may appear under multiple
+        canonicals, every canonical must exist in the snapshot, and the baked
+        payload A must map every folded alias to a valid index in T.
+        """
+        aliases_path = os.path.join(ROOT, "data", "territory_aliases.json")
+        with open(aliases_path) as f:
+            aliases = json.load(f)
+
+        packed = build_page.pack(self.current)
+        terrs = packed["T"]
+        ti = {t: i for i, t in enumerate(terrs)}
+        A = packed["A"]
+
+        # 1. every canonical named in the alias file exists in the snapshot's territory list
+        for canon in aliases:
+            self.assertIn(canon, ti, f"canonical territory {canon!r} from alias file missing in snapshot")
+
+        # 2. no alias collides with a canonical territory (case/accent-folded)
+        folded_canonicals = {build_page.fold_str(t): t for t in terrs}
+
+        # 3. every alias folds to exactly one canonical territory & no alias appears under two canonicals
+        folded_alias_to_canonicals = collections.defaultdict(set)
+
+        for canon, alias_list in aliases.items():
+            self.assertTrue(len(alias_list) > 0, f"canonical {canon!r} has empty alias list")
+            for alias in alias_list:
+                fa = build_page.fold_str(alias)
+                self.assertTrue(len(fa) > 0, f"alias {alias!r} folded to empty string")
+                self.assertNotIn(fa, folded_canonicals,
+                                 f"alias {alias!r} (folded {fa!r}) collides with canonical territory {folded_canonicals.get(fa)!r}")
+                folded_alias_to_canonicals[fa].add(canon)
+
+        for fa, canons in folded_alias_to_canonicals.items():
+            self.assertEqual(len(canons), 1,
+                             f"folded alias {fa!r} resolves to multiple canonicals: {canons}")
+
+        # 4. the baked payload A maps every alias to a valid index into T
+        self.assertEqual(len(A), len(folded_alias_to_canonicals),
+                         "baked payload A size does not match distinct folded aliases")
+        for fa, canon_set in folded_alias_to_canonicals.items():
+            self.assertIn(fa, A, f"folded alias {fa!r} missing from baked payload A")
+            idx = A[fa]
+            self.assertIsInstance(idx, int)
+            self.assertTrue(0 <= idx < len(terrs), f"index {idx} for alias {fa!r} out of bounds for T")
+            canon = list(canon_set)[0]
+            self.assertEqual(terrs[idx], canon, f"baked alias {fa!r} points to {terrs[idx]!r}, expected {canon!r}")
+
+    def test_alias_resolution_examples(self):
+        """USA, usa, U.S.A., Poland, UK, Holland each resolve to the right canonical,
+        driven through the same folding the page uses."""
+        packed = build_page.pack(self.current)
+        terrs = packed["T"]
+        A = packed["A"]
+
+        def resolve(query):
+            raw = query.strip()
+            if raw in terrs:
+                return raw
+            f = build_page.fold_str(raw)
+            if f in A:
+                return terrs[A[f]]
+            return ""
+
+        expected = {
+            "USA": "United States of America",
+            "usa": "United States of America",
+            "U.S.A.": "United States of America",
+            "Poland": "Polska",
+            "UK": "United Kingdom",
+            "Holland": "Benelux",
+        }
+        for query, want in expected.items():
+            got = resolve(query)
+            self.assertEqual(got, want, f"resolve({query!r}) = {got!r}, want {want!r}")
+
+    def test_combobox_structure_and_keyboard_contract(self):
+        """The combobox is hand-rolled ARIA with keyboard navigation and open affordance."""
+        template = build_page.TEMPLATE
+        self.assertIn('role="combobox"', template)
+        self.assertIn('aria-expanded="false"', template)
+        self.assertIn('aria-autocomplete="list"', template)
+        self.assertIn('aria-controls="territories"', template)
+        self.assertIn('role="listbox"', template)
+        self.assertIn('id="terrbtn"', template)
+        self.assertIn('id="territories"', template)
+        self.assertIn('e.key === "ArrowDown"', template)
+        self.assertIn('e.key === "ArrowUp"', template)
+        self.assertIn('e.key === "Enter"', template)
+        self.assertIn('e.key === "Escape"', template)
+        self.assertIn('e.key === "Tab"', template)
+        self.assertIn('commitTerr()', template)
+        self.assertIn('renderTerrList(', template)
 
 
 if __name__ == "__main__":

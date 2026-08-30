@@ -152,8 +152,8 @@ async function main() {
   await evaluate("(() => { U.pop(); UHAY.pop(); UMASK.pop(); run(); })()");
   assert.equal(await evaluate("out.querySelector('.dialsvg text').textContent"), "4",
     "Removing the synthetic sibling restores the resolved setting");
-  assert.equal(await evaluate("document.getElementById('terr').getAttribute('list')"), "territories");
-  assert.equal(await evaluate("document.getElementById('territories').options.length"), 78);
+  assert.equal(await evaluate("document.getElementById('terr').getAttribute('role') === 'combobox' && document.getElementById('terr').getAttribute('aria-controls')"), "territories");
+  assert.equal(await evaluate("document.querySelectorAll('#territories [role=option]').length"), 78);
   assert.equal(await evaluate("document.querySelectorAll('[data-preview]').length > 0"), true);
   await evaluate("out.querySelector('[data-preview]').click()");
   await settle();

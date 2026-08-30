@@ -11,7 +11,7 @@ The page makes the owner identify an Advanced/WiFi versus a Mini before it
 shows a number. They share the current settings set, but only Advanced/WiFi
 machines can use a lot-11 alternate.
 """
-import json, os, re
+import json, os, re, unicodedata
 from collections import defaultdict
 
 from crawlers.fetch_images import thumb_path, thumb_stem
@@ -20,6 +20,7 @@ from staleness import norm
 DATA = "site/data/formula_settings.json"
 STALE = "data/staleness.json"
 HISTORY = "data/setting_history.json"
+ALIASES = "data/territory_aliases.json"
 OUT = "site/index.html"
 
 
@@ -33,6 +34,16 @@ SITE_URL = "https://formuladial.com"
 # og:description metas (plain). A single source so the copy cannot drift.
 TAGLINE = ("Every powder setting Baby Brezza publishes, searchable in your "
            "browser \u2014 no email address required, local to your device.")
+
+
+def fold_str(s):
+    """Fold a string matching the browser's fold() function.
+
+    NFKD decomposition, strip combining characters, lowercase, and trim.
+    """
+    s = unicodedata.normalize("NFKD", s or "")
+    s = re.sub(r"[\u0300-\u036f]", "", s)
+    return s.lower().strip()
 
 
 def thumb_of(image):
@@ -53,15 +64,33 @@ def thumb_of(image):
 def pack(doc):
     """Compact only the current Advanced-family data for the browser payload."""
     recs = doc["records"]
-    terrs = sorted({t for r in recs for t in r["territories"]})
+    unavailable = doc.get("unavailable", [])
+    terrs = sorted({t for r in recs for t in r["territories"]} |
+                   {t for r in unavailable for t in r.get("territories", [])})
     ti = {t: i for i, t in enumerate(terrs)}
     # ``unavailable`` is deliberately a small, separate class of source row:
     # Baby Brezza knows the formula, but has not published a setting that can be
     # used on the dial. Keep it in the browser so it is never mistaken for an
     # unknown product. Older snapshots do not have it yet.
-    unavailable = doc.get("unavailable", [])
     brands = sorted({r["brand"] for r in recs} | {r["brand"] for r in unavailable})
     bi = {b: i for i, b in enumerate(brands)}
+    # Folded matching the page's fold() so lookup keys match in the browser without
+    # client-side re-indexing. An unrecognised territory fails loudly at build time:
+    # a renamed or dropped market upstream must break the build, never silently drop aliases.
+    try:
+        with open(ALIASES) as f:
+            aliases_data = json.load(f)
+    except FileNotFoundError:
+        aliases_data = {}
+    A = {}
+    for canon, alias_list in aliases_data.items():
+        if canon not in ti:
+            raise ValueError(f"Alias names territory absent from snapshot: {canon!r}")
+        for alias in alias_list:
+            fa = fold_str(alias)
+            if not fa:
+                continue
+            A[fa] = ti[canon]
     # The unambiguous settings staleness.py caught changing between the frozen
     # ~2022 copy and the live API. Its example keys are already norm()ed.
     try:
@@ -108,16 +137,11 @@ def pack(doc):
     for r in unavailable:
         mask = 0
         for t in r.get("territories", []):
-            # A future source row may name a territory which has no setting
-            # record; include it in the compact territory dictionary as well.
-            if t not in ti:
-                ti[t] = len(terrs)
-                terrs.append(t)
             mask |= 1 << ti[t]
         unavailable_rows.append([bi[r["brand"]], r.get("type", ""), r.get("stage", ""),
                                  format(mask, "x"), r.get("reason", ""), r.get("upc", []),
                                  thumb_of(r.get("image"))])
-    return {"T": terrs, "B": brands, "R": rows, "U": unavailable_rows,
+    return {"T": terrs, "B": brands, "A": A, "R": rows, "U": unavailable_rows,
             "M": {"label": doc["label"], "counts": doc["counts"],
                   "generated": doc["generated"], "observed": doc.get("observed")}}
 
@@ -342,6 +366,9 @@ footer a{color:var(--ink-2)}
   .field input:focus-visible,.terr input:focus-visible{
     outline:2px solid Highlight; outline-offset:2px;
   }
+  .terropt:hover,.terropt.active,.terropt[aria-selected="true"]{
+    background:Highlight; color:HighlightText; outline:1px solid Highlight;
+  }
 }
 .field svg{flex:none; width:17px; height:17px; color:var(--ink-3)}
 input,select{
@@ -363,6 +390,35 @@ input::placeholder{color:var(--ink-3)}
 .terr label{
   font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-3); flex:none;
+}
+.terrcombobox{position:relative}
+.terrbtn{
+  background:transparent; border:0; padding:6px; cursor:pointer;
+  color:var(--ink-3); display:flex; align-items:center; justify-content:center;
+  flex:none; border-radius:6px;
+}
+.terrbtn:hover{color:var(--ink); background:var(--raised)}
+.terrbtn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+.terrlist{
+  position:absolute; top:calc(100% + 4px); left:0; right:0;
+  max-height:260px; overflow-y:auto; overscroll-behavior:contain;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  box-shadow:var(--shadow); z-index:40; list-style:none; margin:0; padding:4px;
+}
+.terrlist[hidden]{display:none}
+.terropt{
+  display:flex; align-items:center; gap:6px;
+  padding:8px 10px; border-radius:6px; cursor:pointer;
+  font-size:14px; color:var(--ink); line-height:1.3;
+}
+.terropt:hover,.terropt.active,.terropt[aria-selected="true"]{
+  background:var(--accent-soft); color:var(--accent-ink);
+}
+.terropt .optalias{font-weight:600}
+.terropt .optsep{color:var(--ink-3)}
+.terropt .optcanon{color:var(--ink-2)}
+.terropt:hover .optcanon,.terropt.active .optcanon,.terropt[aria-selected="true"] .optcanon{
+  color:var(--accent-ink);
 }
 .scan{
   font:inherit; font-family:"IBM Plex Mono",monospace; font-size:11px;
@@ -687,10 +743,15 @@ footer p{margin:10px 0 0}
     </div>
     <div class="step" id="market-step">
       <div class="stephead"><span class="stepnum">2</span><label class="steplabel" for="terr">Where was it sold?</label><span class="stepstatus" id="market-status">Required for a setting</span></div>
-      <div class="terr">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
-        <input id="terr" type="search" list="territories" autocomplete="off" spellcheck="false" placeholder="Search or choose a market…" aria-label="Market where the formula was bought">
-        <datalist id="territories"></datalist>
+      <div class="terrcombobox">
+        <div class="terr">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+          <input id="terr" type="search" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="territories" aria-activedescendant="" autocomplete="off" spellcheck="false" placeholder="Search or choose a market…" aria-label="Market where the formula was bought">
+          <button class="terrbtn" id="terrbtn" type="button" aria-label="Show all markets" tabindex="-1" title="Show all markets">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <ul class="terrlist" id="territories" role="listbox" aria-label="Markets" hidden></ul>
       </div>
       <div class="stepstatus stephint">Leave blank only to explore all markets.</div>
     </div>
@@ -881,7 +942,8 @@ const UHAY = U.map(r => fold(D.B[r[0]] + " " + r[1] + " " + r[2]));
 const UMASK = U.map(r => BigInt("0x" + r[3]));
 
 const el = id => document.getElementById(id);
-const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
+const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $terrbtn=el("terrbtn"),
+      $out=el("out"), $count=el("count"),
       $empty=el("empty"), $mode=el("mode"), $crumbs=el("crumbs"),
       $lot=el("lot"), $lotrow=el("lotrow"), $lotkeep=el("lotkeep"),
       $pinrow=el("pinrow"), $pinchips=el("pinchips"),
@@ -1012,7 +1074,126 @@ $crumbs.addEventListener("click", e => {
 
 const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const escAttr = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const market = () => D.T.includes($terr.value.trim()) ? $terr.value.trim() : "";
+
+// Exact canonical match outranks aliases to prevent an alias from masking a
+// real territory. Resolving aliases through D.A maps user-familiar names (e.g. USA)
+// to their canonical record index without mutating the underlying dataset.
+const market = () => {
+  const raw = $terr.value.trim();
+  if (D.T.includes(raw)) return raw;
+  const f = fold(raw);
+  if (D.A && Object.prototype.hasOwnProperty.call(D.A, f)){
+    const idx = D.A[f];
+    return D.T[idx] || "";
+  }
+  return "";
+};
+
+// ---- market combobox ----
+// Hand-rolled ARIA combobox: datalist offers no programmatic list open on click
+// and cannot render alias resolutions. aria-activedescendant keeps focus on the
+// input while arrow keys walk options, preventing focus thrashing on mobile.
+let currentTerrItems = [];
+let activeTerrIndex = -1;
+
+const formatAlias = f => (f.length <= 4 && !f.includes(" ")) ? f.toUpperCase() : f.replace(/\b\w/g, c => c.toUpperCase());
+
+function getTerrMatches(query){
+  const raw = (query || "").trim();
+  if (!raw) return D.T.map(t => ({ canon: t, alias: null }));
+  const fq = fold(raw);
+  const results = [];
+  const matchedCanons = new Set();
+  for (const t of D.T){
+    const ft = fold(t);
+    if (ft.includes(fq)){
+      results.push({ canon: t, alias: null, startsWith: ft.startsWith(fq) });
+      matchedCanons.add(t);
+    }
+  }
+  if (D.A){
+    for (const [fa, idx] of Object.entries(D.A)){
+      if (fa.includes(fq)){
+        const canon = D.T[idx];
+        results.push({ canon, alias: formatAlias(fa), startsWith: fa.startsWith(fq) });
+      }
+    }
+  }
+  results.sort((a, b) => {
+    const aExact = fold(a.alias || a.canon) === fq ? 0 : 1;
+    const bExact = fold(b.alias || b.canon) === fq ? 0 : 1;
+    if (aExact !== bExact) return aExact - bExact;
+    const aStarts = a.startsWith ? 0 : 1;
+    const bStarts = b.startsWith ? 0 : 1;
+    if (aStarts !== bStarts) return aStarts - bStarts;
+    const aName = a.alias || a.canon;
+    const bName = b.alias || b.canon;
+    return aName.localeCompare(bName);
+  });
+  const seen = new Set(), deduped = [];
+  for (const r of results){
+    const key = r.canon + "|" + (r.alias || "");
+    if (!seen.has(key)){ seen.add(key); deduped.push(r) }
+  }
+  return deduped;
+}
+
+function renderTerrList(items){
+  currentTerrItems = items;
+  activeTerrIndex = -1;
+  $terr.setAttribute("aria-activedescendant", "");
+  $territories.innerHTML = items.map((item, idx) => {
+    const isAlias = item.alias != null;
+    const label = isAlias
+      ? `<span class="optalias">${esc(item.alias)}</span><span class="optsep"> &mdash; </span><span class="optcanon">${esc(item.canon)}</span>`
+      : `<span>${esc(item.canon)}</span>`;
+    return `<li class="terropt" role="option" id="terr-opt-${idx}" data-idx="${idx}" aria-selected="false">${label}</li>`;
+  }).join("");
+}
+
+function openTerrList(){
+  renderTerrList(getTerrMatches($terr.value));
+  $territories.hidden = false;
+  $terr.setAttribute("aria-expanded", "true");
+}
+
+function closeTerrList(){
+  $territories.hidden = true;
+  $terr.setAttribute("aria-expanded", "false");
+  setActiveTerrIndex(-1);
+}
+
+function setActiveTerrIndex(idx){
+  const opts = $territories.querySelectorAll(".terropt");
+  opts.forEach((opt, i) => {
+    const active = i === idx;
+    opt.classList.toggle("active", active);
+    opt.setAttribute("aria-selected", String(active));
+    if (active){
+      $terr.setAttribute("aria-activedescendant", opt.id);
+      opt.scrollIntoView({ block: "nearest" });
+    }
+  });
+  activeTerrIndex = idx;
+  if (idx < 0) $terr.setAttribute("aria-activedescendant", "");
+}
+
+// Rewriting happens on commit/selection, never on every keystroke: replacing
+// what the owner is actively typing would hijack input focus and cursor position.
+// The page must never filter by a canonical market it has not visibly shown.
+function commitTerr(){
+  const m = market();
+  if (m && $terr.value.trim() !== m) $terr.value = m;
+}
+
+function selectTerrOption(idx){
+  if (idx >= 0 && idx < currentTerrItems.length){
+    $terr.value = currentTerrItems[idx].canon;
+    closeTerrList();
+    clearFold();
+    run();
+  }
+}
 
 // Theme: auto follows the phone. The override exists for the 3am feed, when
 // the phone is still in day mode and the ceiling light is off.
@@ -1669,8 +1850,81 @@ let timer;
 // used to spring.
 const clearFold = () => { filter = {b:null, t:null, s:null}; showAllBrands = false };
 $q.addEventListener("input", () => { clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
-$terr.addEventListener("input", () => { clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
-$terr.addEventListener("change", () => { clearFold(); run() });
+$terrbtn.addEventListener("click", () => {
+  if ($territories.hidden){
+    renderTerrList(D.T.map(t => ({ canon: t, alias: null })));
+    $territories.hidden = false;
+    $terr.setAttribute("aria-expanded", "true");
+    $terr.focus();
+  } else {
+    closeTerrList();
+  }
+});
+$terr.addEventListener("input", () => {
+  openTerrList();
+  clearFold();
+  clearTimeout(timer);
+  timer = setTimeout(run, 90);
+});
+$terr.addEventListener("change", () => { commitTerr(); clearFold(); run() });
+$terr.addEventListener("keydown", e => {
+  if (e.key === "ArrowDown"){
+    e.preventDefault();
+    if ($territories.hidden){
+      openTerrList();
+      if (currentTerrItems.length) setActiveTerrIndex(0);
+    } else if (currentTerrItems.length){
+      const next = activeTerrIndex < currentTerrItems.length - 1 ? activeTerrIndex + 1 : 0;
+      setActiveTerrIndex(next);
+    }
+  } else if (e.key === "ArrowUp"){
+    e.preventDefault();
+    if ($territories.hidden){
+      openTerrList();
+      if (currentTerrItems.length) setActiveTerrIndex(currentTerrItems.length - 1);
+    } else if (currentTerrItems.length){
+      const prev = activeTerrIndex > 0 ? activeTerrIndex - 1 : currentTerrItems.length - 1;
+      setActiveTerrIndex(prev);
+    }
+  } else if (e.key === "Enter"){
+    if (!$territories.hidden && activeTerrIndex >= 0){
+      e.preventDefault();
+      selectTerrOption(activeTerrIndex);
+    } else {
+      commitTerr();
+      closeTerrList();
+      clearFold();
+      run();
+    }
+  } else if (e.key === "Escape"){
+    if (!$territories.hidden){
+      e.preventDefault();
+      closeTerrList();
+    }
+  } else if (e.key === "Tab"){
+    commitTerr();
+    closeTerrList();
+  }
+});
+$territories.addEventListener("click", e => {
+  const opt = e.target.closest(".terropt");
+  if (opt) selectTerrOption(+opt.dataset.idx);
+});
+$territories.addEventListener("mousemove", e => {
+  const opt = e.target.closest(".terropt");
+  if (opt){
+    const idx = +opt.dataset.idx;
+    if (idx !== activeTerrIndex) setActiveTerrIndex(idx);
+  }
+});
+document.addEventListener("click", e => {
+  if (!e.target.closest(".terrcombobox")){
+    if (!$territories.hidden){
+      commitTerr();
+      closeTerrList();
+    }
+  }
+});
 $out.addEventListener("click", e => {
   const pinButton = e.target.closest("[data-pinbtn]");
   if (pinButton){
@@ -1728,7 +1982,7 @@ $imagebox.addEventListener("click", e => {
 // the floor stays 390 because the lot placeholder does not. The old copy
 // needed 299.5px and was clipped mid-barcode on every phone.
 $q.placeholder = "Similac or 070074680644";
-$territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
+renderTerrList(D.T.map(t => ({ canon: t, alias: null })));
 const prevTerr = store.get("brezza.terr", "");
 $terr.value = D.T.includes(prevTerr) ? prevTerr : "";
 renderPins();
