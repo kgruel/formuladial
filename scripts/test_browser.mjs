@@ -154,6 +154,47 @@ async function main() {
     "Removing the synthetic sibling restores the resolved setting");
   assert.equal(await evaluate("document.getElementById('terr').getAttribute('role') === 'combobox' && document.getElementById('terr').getAttribute('aria-controls')"), "territories");
   assert.equal(await evaluate("document.querySelectorAll('#territories [role=option]').length"), 78);
+
+  // The alias that started all this: a real owner typed "USA", nothing matched,
+  // and the page quietly searched every market instead of saying so. Driven
+  // through real events rather than asserted against the handler's source --
+  // a keydown branch that is only ever grepped for is one a refactor can delete
+  // while the test stays green.
+  const pressTerr = key => evaluate(
+    `terr.dispatchEvent(new KeyboardEvent("keydown", {key:${JSON.stringify(key)}, bubbles:true, cancelable:true}))`);
+  await setValue("terr", "", "input");
+  await evaluate(`terr.focus(); terr.value = "USA"; terr.dispatchEvent(new Event("input", {bubbles:true}))`);
+  await settle();
+  assert.equal(await evaluate("terr.getAttribute('aria-expanded')"), "true",
+    "Typing a market opens the listbox");
+  assert.match(await evaluate("document.querySelector('#territories [role=option]').textContent"),
+    /USA.*United States of America/,
+    "An alias hit names both what was typed and the market it resolves to");
+  await pressTerr("ArrowDown");
+  await settle();
+  assert.notEqual(await evaluate("terr.getAttribute('aria-activedescendant')"), "",
+    "ArrowDown moves the active option");
+  await pressTerr("Enter");
+  await settle();
+  assert.equal(await evaluate("terr.value"), "United States of America",
+    "Choosing an alias rewrites the field to the market actually being filtered by");
+  assert.equal(await evaluate("market()"), "United States of America");
+  assert.equal(await evaluate("terr.getAttribute('aria-expanded')"), "false",
+    "Choosing closes the listbox");
+  await pressTerr("ArrowDown");
+  await settle();
+  await pressTerr("Escape");
+  await settle();
+  assert.equal(await evaluate("terr.getAttribute('aria-expanded')"), "false",
+    "Escape closes the listbox again");
+  // browsing markets without typing is the affordance the datalist never had
+  await evaluate("document.getElementById('terrbtn').click()");
+  await settle();
+  assert.equal(await evaluate("document.querySelectorAll('#territories [role=option]').length"), 78,
+    "The toggle offers every market with nothing typed");
+  await evaluate("document.getElementById('terrbtn').click()");
+  await settle();
+  await setValue("terr", "Bahrain");
   assert.equal(await evaluate("document.querySelectorAll('[data-preview]').length > 0"), true);
   await evaluate("out.querySelector('[data-preview]').click()");
   await settle();
