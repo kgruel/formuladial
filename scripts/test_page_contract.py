@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline contract checks for the generated current-settings app."""
 import collections
+import copy
 import json
 import os
 import re
@@ -393,6 +394,38 @@ class PageContractTests(unittest.TestCase):
                      "ibm-plex-mono-500-latin.woff2", "ibm-plex-mono-600-latin.woff2"):
             self.assertTrue(os.path.exists(os.path.join(ROOT, "site", "fonts", name)), name)
 
+    def test_a_market_leaving_the_catalogue_does_not_break_the_build(self):
+        """A dropped market must cost the page nothing but its own aliases.
+
+        Baby Brezza adds and removes markets. The alias lookup once raised on a
+        canonical the snapshot did not carry, which would have taken down the
+        monthly crawl's rebuild and left the live page frozen over a change the
+        page handles fine. Pinned here because the tolerant path is invisible in
+        normal builds: nothing else notices it until the day it matters.
+        """
+        snapshot = copy.deepcopy(self.current)
+        departed = next(canon for canon in json.load(
+            open(os.path.join(ROOT, "data", "territory_aliases.json")))
+            if any(canon in r["territories"] for r in snapshot["records"]))
+        for group in (snapshot["records"], snapshot.get("unavailable", [])):
+            for row in group:
+                row["territories"] = [t for t in row.get("territories", []) if t != departed]
+                variants = [v for v in (row.get("territory_variants") or [])
+                            if [t for t in v["territories"] if t != departed]]
+                for v in variants:
+                    v["territories"] = [t for t in v["territories"] if t != departed]
+                if variants:
+                    row["territory_variants"] = variants
+                else:
+                    row.pop("territory_variants", None)
+        snapshot["records"] = [r for r in snapshot["records"] if r["territories"]]
+        snapshot["unavailable"] = [r for r in snapshot.get("unavailable", []) if r["territories"]]
+
+        packed = build_page.pack(snapshot)          # must not raise
+        self.assertNotIn(departed, packed["T"])
+        self.assertTrue(all(0 <= i < len(packed["T"]) for i in packed["A"].values()),
+                        "a departed market must leave no alias pointing past the end of T")
+
     def test_alias_ratchet_enumerable_properties(self):
         """The alias table is an enumerable ratchet over data/territory_aliases.json.
 
@@ -410,9 +443,20 @@ class PageContractTests(unittest.TestCase):
         ti = {t: i for i, t in enumerate(terrs)}
         A = packed["A"]
 
-        # 1. every canonical named in the alias file exists in the snapshot's territory list
-        for canon in aliases:
-            self.assertIn(canon, ti, f"canonical territory {canon!r} from alias file missing in snapshot")
+        # 1. A market can leave Baby Brezza's catalogue between crawls, so an
+        # alias group naming a territory this snapshot no longer carries is
+        # inert rather than wrong -- and failing here would block the monthly
+        # refresh over ordinary data movement, freezing the published page to
+        # protect an unused key. The property with teeth is that such a group
+        # contributes nothing: no alias may ever point at an index outside T.
+        orphans = [canon for canon in aliases if canon not in ti]
+        for canon in orphans:
+            for alias in aliases[canon]:
+                self.assertNotIn(build_page.fold_str(alias), A,
+                                 f"alias {alias!r} names absent territory {canon!r} but was baked in")
+        for folded, index in A.items():
+            self.assertTrue(isinstance(index, int) and 0 <= index < len(terrs),
+                            f"alias {folded!r} maps to {index!r}, outside T")
 
         # 2. no alias collides with a canonical territory (case/accent-folded)
         folded_canonicals = {build_page.fold_str(t): t for t in terrs}

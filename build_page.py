@@ -11,7 +11,7 @@ The page makes the owner identify an Advanced/WiFi versus a Mini before it
 shows a number. They share the current settings set, but only Advanced/WiFi
 machines can use a lot-11 alternate.
 """
-import json, os, re, unicodedata
+import json, os, re, sys, unicodedata
 from collections import defaultdict
 
 from crawlers.fetch_images import thumb_path, thumb_stem
@@ -74,18 +74,31 @@ def pack(doc):
     # unknown product. Older snapshots do not have it yet.
     brands = sorted({r["brand"] for r in recs} | {r["brand"] for r in unavailable})
     bi = {b: i for i, b in enumerate(brands)}
-    # Folded matching the page's fold() so lookup keys match in the browser without
-    # client-side re-indexing. An unrecognised territory fails loudly at build time:
-    # a renamed or dropped market upstream must break the build, never silently drop aliases.
+    # Folded matching the page's fold() so lookup keys match in the browser
+    # without client-side re-indexing.
+    #
+    # An alias for a territory this snapshot does not carry is dropped, loudly,
+    # rather than raised. Baby Brezza adds and removes markets, and a market
+    # going away is ordinary data movement, not a defect: the aliases for it are
+    # simply inert. Raising here would take down the monthly crawl's rebuild and
+    # leave the published page frozen over a change that costs the page nothing
+    # -- a far worse outcome than an unused key. What must never happen is an
+    # alias pointing at a territory index that does not exist, and dropping it
+    # is exactly what prevents that.
     try:
         with open(ALIASES) as f:
             aliases_data = json.load(f)
     except FileNotFoundError:
         aliases_data = {}
     A = {}
+    orphans = sorted(canon for canon in aliases_data if canon not in ti)
+    if orphans:
+        print("note: %d alias group(s) name a territory this snapshot does not "
+              "carry; their aliases are dropped: %s" % (len(orphans), ", ".join(orphans)),
+              file=sys.stderr)
     for canon, alias_list in aliases_data.items():
         if canon not in ti:
-            raise ValueError(f"Alias names territory absent from snapshot: {canon!r}")
+            continue
         for alias in alias_list:
             fa = fold_str(alias)
             if not fa:
