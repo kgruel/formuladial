@@ -14,9 +14,15 @@ const chromium = [process.env.CHROMIUM, "/opt/homebrew/bin/chromium",
 if (!chromium) throw new Error("Set CHROMIUM to a Chromium/Chrome executable");
 const profile = mkdtempSync(join(tmpdir(), "brezza-browser-test-"));
 const port = 9300 + (process.pid % 500);
+// A Linux CI runner has no user namespaces to sandbox into, so Chrome exits
+// before it opens the DevTools port -- and this harness spawns it with stdio
+// ignored, so the only symptom is the endpoint never arriving. Kept off local
+// runs, where the sandbox works and should stay on.
+const ciFlags = process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
 const child = spawn(chromium, [
   "--headless=new",
   "--disable-gpu",
+  ...ciFlags,
   "--no-first-run",
   "--no-default-browser-check",
   "--remote-allow-origins=*",
