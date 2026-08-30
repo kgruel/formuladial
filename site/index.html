@@ -245,6 +245,22 @@ input::placeholder{color:var(--ink-3)}
   font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em;
   color:var(--ink-3); border:1px solid var(--line-2); padding:2px 7px; border-radius:5px;
 }
+.crumbs{display:flex; gap:7px; flex-wrap:wrap; margin-top:14px}
+.crumbs:empty{display:none}
+.group{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  width:100%; text-align:left; font:inherit; color:var(--ink); cursor:pointer;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:14px 16px; box-shadow:var(--shadow);
+}
+.group:hover{border-color:var(--accent); background:var(--surface)}
+.group .name{margin:0; font-size:17px; font-weight:600; font-family:"Zilla Slab",serif}
+.group .groupcount{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; flex:none;
+}
+.group.expander{justify-content:center; border-style:dashed}
+.group.expander .name{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-ink); font-weight:400}
 .quickrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:11px}
 .quicklabel{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
 .chips{display:flex; gap:7px; flex-wrap:wrap}
@@ -527,11 +543,11 @@ footer p{margin:10px 0 0}
         </button>
       </div>
       <div class="quickrow" id="pinrow" hidden><span class="quicklabel">Pinned</span><div class="chips" id="pinchips"></div></div>
-      <div class="quickrow"><span class="quicklabel">Popular brands</span><div class="chips" id="chips"></div></div>
     </div>
   </div>
 </section>
 
+<div class="crumbs" id="crumbs"></div>
 <div class="count" id="count"></div>
 <ol id="out"></ol>
 <div class="empty" id="empty" hidden></div>
@@ -697,7 +713,7 @@ const UMASK = U.map(r => BigInt("0x" + r[3]));
 
 const el = id => document.getElementById(id);
 const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $out=el("out"), $count=el("count"),
-      $empty=el("empty"), $mode=el("mode"), $chips=el("chips"),
+      $empty=el("empty"), $mode=el("mode"), $crumbs=el("crumbs"),
       $lot=el("lot"), $lotrow=el("lotrow"), $lotkeep=el("lotkeep"),
       $pinrow=el("pinrow"), $pinchips=el("pinchips"),
       $lotstate=el("lotstate"), $machineStep=el("machine-step"),
@@ -750,8 +766,80 @@ try{ localStorage.removeItem("brezza.q") }catch(e){}
 
 let machine = store.get("brezza.machine", "");
 if (!["advanced", "mini"].includes(machine)) machine = "";
-let chosen = null;
+let filter = {b:null, t:null, s:null};
+let showAllBrands = false;
 let shownResult = null;
+
+const COLUMNS = [
+  {key:"b", of: r => D.B[r[0]]},
+  {key:"t", of: r => r[1]},
+  {key:"s", of: r => r[2]},
+];
+
+// The one record this lookup has landed on, or null while anything is still
+// unresolved. A row Baby Brezza lists without a usable setting counts as a
+// candidate exactly like a real one: a same-named sibling is another thing the
+// container might be, and it cannot sit unresolved under a number the page
+// calls an exact match. Narrowing never deadlocks on one -- (brand, type,
+// stage) is unique across records and unavailable rows within a market, so a
+// sibling always drops out as the fold descends.
+const resolveHit = (hits, unavailable) =>
+  market() && hits.length === 1 && !unavailable.length ? hits[0] : null;
+
+// Folds over every candidate, not only the ones carrying a number. An
+// unavailable row is a thing the tin might be, so it has to be separable by the
+// same ladder -- otherwise a lone hit beside a lone unavailable sibling has
+// nothing left to fold on and the lookup can never resolve. Record and
+// unavailable rows share their first three columns positionally, so one
+// accessor reads both.
+function foldOn(hits, unavailable){
+  for (const col of COLUMNS){
+    if (filter[col.key] != null) continue;
+    const seen = new Set();
+    for (const i of hits) seen.add(col.of(D.R[i]));
+    for (const i of unavailable) seen.add(col.of(U[i]));
+    if (seen.size > 1) return col;
+  }
+  return null;
+}
+
+const passesFilter = i => {
+  const r = D.R[i];
+  return (filter.b == null || D.B[r[0]] === filter.b) &&
+         (filter.t == null || r[1] === filter.t) &&
+         (filter.s == null || r[2] === filter.s);
+};
+const passesFilterU = i => {
+  const r = U[i];
+  return (filter.b == null || D.B[r[0]] === filter.b) &&
+         (filter.t == null || r[1] === filter.t) &&
+         (filter.s == null || r[2] === filter.s);
+};
+
+function clearCrumb(key){
+  const idx = COLUMNS.findIndex(c => c.key === key);
+  if (idx >= 0){
+    for (let i = idx; i < COLUMNS.length; i++) filter[COLUMNS[i].key] = null;
+  }
+  showAllBrands = false;
+  run();
+}
+
+function renderCrumbs(){
+  const active = COLUMNS.filter(c => filter[c.key] != null);
+  if (!active.length){ $crumbs.innerHTML = ""; return }
+  $crumbs.innerHTML = active.map(c => {
+    const val = filter[c.key];
+    const label = c.key === "s" && val && !val.toLowerCase().startsWith("stage") ? `Stage ${val}` : val;
+    return `<span class="pin"><button class="chip" type="button" data-crumb="${c.key}">${esc(label)}</button>` +
+      `<button class="pinx" type="button" data-crumb="${c.key}" aria-label="Remove ${escAttr(label)}">&times;</button></span>`;
+  }).join("");
+}
+
+$crumbs.addEventListener("click", e => {
+  const btn = e.target.closest("[data-crumb]");
+  if (btn) clearCrumb(btn.dataset.crumb);
+});
 
 const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const escAttr = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -785,20 +873,25 @@ function applyMachine(){
   });
 }
 
-$chips.addEventListener("click", e => {
-  const b = e.target.closest(".chip");
-  if (!b) return;
-  chosen = null; $q.value = b.textContent; run(); $q.focus();
-});
-
 const digits = s => s.replace(/[^0-9]/g,"");
 const isBarcode = s => digits(s).length >= 8 && digits(s).length === s.replace(/[\s-]/g,"").length;
 
 function search(){
   const raw = $q.value.trim();
-  if (!raw) return {mode:"", hits:[], unavailable:[]};
   const ti = D.T.indexOf(market());
   const bit = ti >= 0 ? (1n << BigInt(ti)) : 0n;
+
+  if (!raw){
+    if (ti < 0) return {mode:"", hits:[], unavailable:[]};
+    const hits = [], unavailable = [];
+    for (let i = 0; i < D.R.length; i++){
+      if ((MASK[i] & bit) !== 0n) hits.push(i);
+    }
+    for (let i = 0; i < U.length; i++){
+      if ((UMASK[i] & bit) !== 0n) unavailable.push(i);
+    }
+    return {mode:"text", hits, unavailable};
+  }
 
   if (isBarcode(raw)){
     // Same tin, two spellings: scanners hand back 12-digit UPC-A or 13-digit
@@ -1011,14 +1104,12 @@ function productImage(name, label, interactive=true){
   return `<span class="imagewrap"${attrs}><img class="thumb" src="thumbs/${escAttr(name)}.webp" loading="lazy" decoding="async" alt=""><img class="imagepreview" src="thumbs/${escAttr(name)}.webp" loading="lazy" decoding="async" alt=""></span>`;
 }
 
-// The one record this lookup has landed on, or null while anything is still
-// unresolved. Rows Baby Brezza lists without a usable setting count as
-// candidates: a same-named sibling is another thing the container might be,
-// and it cannot sit unresolved under a number called an exact match.
-function resolveHit(hits, unavailable){
-  if (!market() || !hits.length) return null;
-  if (chosen != null) return chosen;
-  return hits.length + unavailable.length === 1 ? hits[0] : null;
+function groupRow(col, group){
+  const label = col.key === "s" && group.val && !group.val.toLowerCase().startsWith("stage") ? `Stage ${group.val}` : group.val;
+  const countLabel = `${group.count} ${group.count === 1 ? "formula" : "formulas"}`;
+  return `<li><button class="group" type="button" data-fold="${col.key}" data-val="${escAttr(group.val)}">` +
+    `<span class="name">${esc(label)}</span>` +
+    `<span class="groupcount">${countLabel}</span></button></li>`;
 }
 
 // A step is done when it has resolved, never merely because it was touched --
@@ -1040,7 +1131,7 @@ function updateSteps(raw, resolved){
   $machineStatus.textContent = lotBlocked ? "Lot number needed"
     : machine === "advanced" ? "Advanced / WiFi" : machine === "mini" ? "Mini" : "Required";
   $marketStatus.textContent = selectedMarket ? selectedMarket : invalidMarket ? "Choose a listed market" : "Required for a setting";
-  $searchStatus.textContent = resolved != null ? "Formula chosen" : raw ? "Searching formulas" : "Brand, formula name, or barcode";
+  $searchStatus.textContent = resolved != null ? "Formula selected" : raw ? "Searching formulas" : "Brand, formula name, or barcode";
   syncLot(lotBlocked);
 }
 
@@ -1053,16 +1144,39 @@ function run(){
   if (!machine){
     updateSteps(raw, null);
     $mode.hidden = true; $count.textContent=""; $out.innerHTML=""; $empty.hidden=false;
+    $crumbs.innerHTML="";
     $empty.innerHTML = "<p>Start by choosing your machine.</p>";
     return;
   }
-  const {mode, hits, unavailable} = search();
-  if (!hits.includes(chosen)) chosen = null;
+  renderCrumbs();
+  const {mode, hits: rawHits, unavailable: rawUnavailable} = search();
+  let hits, unavailable;
+  if (mode === "barcode"){
+    const fHits = rawHits.filter(passesFilter);
+    const fUnav = rawUnavailable.filter(passesFilterU);
+    if (fHits.length || fUnav.length){
+      hits = fHits;
+      unavailable = fUnav;
+    } else {
+      filter = {b:null, t:null, s:null};
+      hits = rawHits;
+      unavailable = rawUnavailable;
+    }
+  } else {
+    hits = rawHits.filter(passesFilter);
+    unavailable = rawUnavailable.filter(passesFilterU);
+  }
+  // Narrowing to one record does not un-know that a row the same search turned
+  // up has no published setting, so the resolved card keeps listing it; only the
+  // ambiguity test uses the narrowed list. Browsing is not a search, so with no
+  // query there is no such set -- otherwise every unavailable row in the market
+  // would pile up under an unrelated result.
+  const unavailableCtx = raw ? rawUnavailable : unavailable;
   const resolved = resolveHit(hits, unavailable);
   updateSteps(raw, resolved);
   $mode.hidden = mode !== "barcode";
 
-  if (!raw){
+  if (!raw && !market()){
     // No hint here: step 3's placeholder and status already instruct, and the
     // amber `needs` highlight is pointing at them.
     $count.textContent=""; $out.innerHTML=""; $empty.hidden=true;
@@ -1085,44 +1199,83 @@ function run(){
     $out.innerHTML = unavailable.slice(0, MAX).map(unavailableCard).join("");
     return;
   }
-  // Anywhere is intentionally useful for browsing, but market-specific source
-  // rows can disagree. Never turn it into a dial instruction: require the
-  // market selector before rendering any actionable result, even for one hit.
-  if (!market()){
-    $count.textContent = `${hits.length} possible ${hits.length === 1 ? "match" : "matches"}`;
-    $out.innerHTML = `<li class="choicehead"><h2>Step 2: choose where it was sold</h2><p>Search for or choose a market before using a dial setting. The same formula name or barcode can point to different products in different markets.</p></li>` +
-      hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("");
+
+  // Barcode mode bypasses the fold entirely.
+  if (mode === "barcode"){
+    if (!market()){
+      $count.textContent = `${hits.length} possible ${hits.length === 1 ? "match" : "matches"}`;
+      $out.innerHTML = `<li class="choicehead"><h2>Step 2: choose where it was sold</h2><p>Search for or choose a market before using a dial setting. The same formula name or barcode can point to different products in different markets.</p></li>` +
+        hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("");
+      return;
+    }
+    if (hits.length > 1){
+      $count.textContent = `${hits.length + unavailable.length} possible matches`;
+      const warning = "More than one product or setting uses this barcode. Do not use a dial setting until you choose the matching formula and market.";
+      const alsoUnavailable = unavailable.length
+        ? ` ${unavailable.length === 1 ? "One match has" : `${unavailable.length} matches have`} no published setting; ${unavailable.length === 1 ? "it is" : "they are"} listed below without a number.`
+        : "";
+      $out.innerHTML = `<li class="choicehead"><h2>Step 4: which formula matches your container?</h2><p>${warning}${alsoUnavailable}</p></li>` +
+        hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("") +
+        unavailable.slice(0, MAX).map(unavailableCard).join("");
+      return;
+    }
+  }
+
+  if (resolved != null){
+    const i = resolved;
+    const resultChanged = shownResult !== i;
+    const notes = ["Exact formula match"];
+    if (lotUndecided(D.R[i])) notes.push("setting depends on your lot number");
+    if (unavailableCtx.length) notes.push(
+      `${unavailableCtx.length} related formula${unavailableCtx.length === 1 ? "" : "s"} without a published setting`);
+    $count.textContent = notes.join(" — ");
+    $out.innerHTML = resultCard(i, terms) + unavailableCtx.map(unavailableCard).join("");
+    shownResult = i;
+    if (resultChanged) requestAnimationFrame(() => $out.firstElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"}));
     return;
   }
-  if (resolved == null){
-    $count.textContent = `${hits.length + unavailable.length} possible matches`;
-    const warning = mode === "barcode"
-      ? "More than one product or setting uses this barcode. Do not use a dial setting until you choose the matching formula and market."
-      : "Several products match this search. Choose the exact formula before using a dial setting.";
-    // An unavailable row is not a choosable setting, so it is never a choice
-    // card -- picking it could only promise a number Baby Brezza never
-    // published. It counts as a candidate and is listed below as context, and
-    // its own card already says what to do if that is the tin in hand.
-    const alsoUnavailable = unavailable.length
-      ? ` ${unavailable.length === 1 ? "One match has" : `${unavailable.length} matches have`} no published setting; ${unavailable.length === 1 ? "it is" : "they are"} listed below without a number.`
-      : "";
-    $out.innerHTML = `<li class="choicehead"><h2>Step 4: which formula matches your container?</h2><p>${warning}${alsoUnavailable}</p></li>` +
-      hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("") +
-      unavailable.slice(0, MAX).map(unavailableCard).join("");
+
+  const foldCol = foldOn(hits, unavailable);
+  if (foldCol){
+    const counts = new Map();
+    const tally = v => counts.set(v, (counts.get(v) || 0) + 1);
+    for (const i of hits) tally(foldCol.of(D.R[i]));
+    for (const i of unavailable) tally(foldCol.of(U[i]));
+    let groups = [...counts.entries()].map(([val, count]) => ({val, count}));
+    if (foldCol.key === "b"){
+      const quickOrder = b => { const idx = QUICK.indexOf(b); return idx >= 0 ? idx : QUICK.length };
+      groups.sort((a, b) => quickOrder(a.val) - quickOrder(b.val) || a.val.localeCompare(b.val));
+    } else {
+      groups.sort((a, b) => a.val.localeCompare(b.val, undefined, {numeric:true}));
+    }
+    // With a search running, the count states how many things the tin might
+    // still be -- a row with no published setting among them, since it counts
+    // toward ambiguity exactly like a candidate. Browsing is not a search, so
+    // nothing there is a "match" yet; naming the level is the honest report.
+    const candidates = hits.length + unavailable.length;
+    const LEVELS = {b:"brands", t:"formulas", s:"stages"};
+    $count.textContent = raw
+      ? `${candidates} possible ${candidates === 1 ? "match" : "matches"}`
+      : `${groups.length.toLocaleString()} ${LEVELS[foldCol.key]} in ${market()}`;
+    let listHTML = "";
+    if (foldCol.key === "b" && groups.length > 12 && !showAllBrands){
+      listHTML = groups.slice(0, 12).map(g => groupRow(foldCol, g)).join("") +
+        `<li><button class="group expander" type="button" data-expand="brands"><span class="name">Show all ${groups.length} brands</span><span class="groupcount">+${groups.length - 12} more</span></button></li>`;
+    } else {
+      listHTML = groups.map(g => groupRow(foldCol, g)).join("");
+    }
+    $out.innerHTML = listHTML + (unavailable.length ? unavailable.slice(0, MAX).map(unavailableCard).join("") : "");
     return;
   }
-  const i = resolved;
-  const resultChanged = shownResult !== i;
-  // one dash-joined line, so a gated result that also has unresolved siblings
-  // does not read as two sentences sharing a dash
-  const notes = ["Exact formula match"];
-  if (lotUndecided(D.R[i])) notes.push("setting depends on your lot number");
-  if (unavailable.length) notes.push(
-    `${unavailable.length} related formula${unavailable.length === 1 ? "" : "s"} without a published setting`);
-  $count.textContent = notes.join(" — ");
-  $out.innerHTML = resultCard(i, terms) + unavailable.map(unavailableCard).join("");
-  shownResult = i;
-  if (resultChanged) requestAnimationFrame(() => $out.firstElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"}));
+
+  // foldOn returned null with >1 hits (unreachable with market, reachable via global collisions without market)
+  $count.textContent = `${hits.length + unavailable.length} possible matches`;
+  const heading = !market()
+    ? `<li class="choicehead"><h2>Step 2: choose where it was sold</h2><p>Search for or choose a market before using a dial setting. The same formula name or barcode can point to different products in different markets.</p></li>`
+    : `<li class="choicehead"><h2>Step 4: which formula matches your container?</h2><p>Several products match this search. Choose the exact formula before using a dial setting.</p></li>`;
+  $out.innerHTML = heading +
+    hits.slice(0, MAX).map(i => choiceCard(i, terms)).join("") +
+    unavailable.slice(0, MAX).map(unavailableCard).join("");
 }
 
 // Coverage facts only. Which machine is selected already shows in step 1 and
@@ -1189,21 +1342,6 @@ const savePins = () => store.set("brezza.pins", JSON.stringify(pins));
 const pinOf = i => { const r = D.R[i]; return {b:D.B[r[0]], t:r[1], s:r[2], m:market()} };
 const samePin = (a,b) => a.b===b.b && a.t===b.t && a.s===b.s && a.m===b.m;
 const pinnedIndex = i => pins.findIndex(p => samePin(p, pinOf(i)));
-// The record a pin names, preferring one sold in the pin's market; null when
-// the current dataset no longer carries it, in which case run() falls back to
-// whatever the replayed search honestly finds.
-function findPinned(p){
-  const ti = D.T.indexOf(p.m);
-  const bit = ti >= 0 ? (1n << BigInt(ti)) : 0n;
-  let fallback = null;
-  for (let i = 0; i < D.R.length; i++){
-    const r = D.R[i];
-    if (D.B[r[0]] !== p.b || r[1] !== p.t || r[2] !== p.s) continue;
-    if ((MASK[i] & bit) !== 0n) return i;
-    if (fallback == null) fallback = i;
-  }
-  return fallback;
-}
 function renderPins(){
   $pinrow.hidden = !pins.length;
   $pinchips.innerHTML = pins.map((p, n) =>
@@ -1215,8 +1353,9 @@ $pinchips.addEventListener("click", e => {
   if (go){
     const p = pins[+go.dataset.pin];
     $terr.value = p.m || "";
-    $q.value = `${p.b} ${p.t}`;
-    chosen = findPinned(p);
+    $q.value = "";
+    filter = {b:p.b, t:p.t, s:p.s};
+    showAllBrands = false;
     run();
     return;
   }
@@ -1234,7 +1373,6 @@ $lotkeep.addEventListener("change", () => {
 $lot.addEventListener("input", run);
 document.querySelectorAll("[data-machine]").forEach(button => button.addEventListener("click", () => {
   machine = button.dataset.machine;
-  chosen = null;
   store.set("brezza.machine", machine);
   applyMachine();
   run();
@@ -1260,7 +1398,6 @@ function acceptCode(code){
   if (!code) return;
   if (code !== lastRead){ lastRead = code; return }  // same code twice, like theirs
   closeScanner();
-  chosen = null;
   $q.value = code;
   run();
 }
@@ -1357,9 +1494,14 @@ $scanner.addEventListener("click", e => { if (e.target === $scanner) closeScanne
 addEventListener("keydown", e => { if (e.key === "Escape" && !$scanner.hidden) closeScanner() });
 
 let timer;
-$q.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer = setTimeout(run, 90) });
-$terr.addEventListener("input", () => { chosen = null; clearTimeout(timer); timer = setTimeout(run, 90) });
-$terr.addEventListener("change", () => { chosen = null; run() });
+// A fold crumb refines the search it was picked from, so retyping the search
+// retires it. Leaving it pinned would filter the new query down to nothing and
+// say only "no match" -- the same silent-stale-filter trap the market field
+// used to spring.
+const clearFold = () => { filter = {b:null, t:null, s:null}; showAllBrands = false };
+$q.addEventListener("input", () => { clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
+$terr.addEventListener("input", () => { clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
+$terr.addEventListener("change", () => { clearFold(); run() });
 $out.addEventListener("click", e => {
   const pinButton = e.target.closest("[data-pinbtn]");
   if (pinButton){
@@ -1377,10 +1519,26 @@ $out.addEventListener("click", e => {
     $imagebox.showModal();
     return;
   }
+  const expandBtn = e.target.closest("[data-expand]");
+  if (expandBtn){
+    showAllBrands = true;
+    run();
+    return;
+  }
+  const foldBtn = e.target.closest("[data-fold]");
+  if (foldBtn){
+    filter[foldBtn.dataset.fold] = foldBtn.dataset.val;
+    showAllBrands = false;
+    run();
+    return;
+  }
   const button = e.target.closest("[data-choice]");
-  if (!button) return;
-  chosen = +button.dataset.choice;
-  run();
+  if (button){
+    const r = D.R[+button.dataset.choice];
+    filter = {b: D.B[r[0]], t: r[1], s: r[2]};
+    run();
+    return;
+  }
 });
 $out.addEventListener("keydown", e => {
   const preview = e.target.closest("[data-preview]");
@@ -1404,8 +1562,6 @@ $q.placeholder = "Similac or 070074680644";
 $territories.innerHTML = D.T.map(t => `<option value="${escAttr(t)}"></option>`).join("");
 const prevTerr = store.get("brezza.terr", "");
 $terr.value = D.T.includes(prevTerr) ? prevTerr : "";
-$chips.innerHTML = QUICK.filter(b => D.B.includes(b))
-  .map(b => `<button class="chip" type="button">${esc(b)}</button>`).join("");
 renderPins();
 // A kept lot exists only if the owner ticked the box, so the ticked state on
 // return is simply whether a kept copy exists.

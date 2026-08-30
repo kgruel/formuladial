@@ -129,6 +129,29 @@ async function main() {
   assert.equal(await evaluate("out.querySelector('.rec.result') !== null"), true);
   assert.equal(await evaluate("out.querySelector('.rec.result .dialsvg').getBoundingClientRect().width >= 96"), true);
   assert.match(await evaluate("out.querySelector('.observed').textContent"), /Last checked against Baby Brezza’s data/);
+
+  // A row Baby Brezza lists without a usable setting counts toward ambiguity
+  // exactly like a real candidate. Today's snapshot carries four such rows and
+  // none of them collides with a record, so the rule is unreachable through the
+  // UI -- and an unreachable rule is one a later refactor deletes without
+  // noticing. Arm it with a synthetic row instead of trusting a source match.
+  await evaluate(`(() => {
+    const bit = 1n << BigInt(D.T.indexOf("Bahrain"));
+    U.push([0, "Synthetic Ambiguity Row", "1", bit.toString(16), "no_setting",
+            ["5099864016222"], null]);
+    UHAY.push(fold(D.B[0] + " Synthetic Ambiguity Row 1"));
+    UMASK.push(bit);
+    run();
+  })()`);
+  assert.equal(await evaluate("out.querySelectorAll('.dialsvg text').length && out.querySelector('.dialsvg text').textContent !== '×'"), false,
+    "A same-named row with no published setting must block the exact-match dial");
+  assert.equal(await evaluate("out.querySelector('.rec.result')"), null,
+    "One hit plus one unresolved sibling is not an exact match");
+  assert.match(await evaluate("out.textContent"), /publishes no usable setting/,
+    "The unresolved sibling must be listed as context");
+  await evaluate("(() => { U.pop(); UHAY.pop(); UMASK.pop(); run(); })()");
+  assert.equal(await evaluate("out.querySelector('.dialsvg text').textContent"), "4",
+    "Removing the synthetic sibling restores the resolved setting");
   assert.equal(await evaluate("document.getElementById('terr').getAttribute('list')"), "territories");
   assert.equal(await evaluate("document.getElementById('territories').options.length"), 78);
   assert.equal(await evaluate("document.querySelectorAll('[data-preview]').length > 0"), true);
@@ -349,19 +372,22 @@ async function main() {
     "The same record with no lot is undecided, not a stop");
 
   // a row Baby Brezza publishes no setting for is a candidate, not a choice:
-  // it forces the choice state and is listed below as context.
+  // it forces the choice state and is listed below as context. The fold has to
+  // separate it like any other candidate, or a lone hit beside a lone
+  // unavailable sibling would have nothing left to narrow on.
   await setValue("terr", "Australia/New Zealand");
   await setValue("q", "neocate syneo", "input");
   assert.match(await evaluate("count.textContent"), /^2 possible matches$/);
-  assert.equal(await evaluate("out.querySelectorAll('[data-choice]').length"), 1);
+  assert.equal(await evaluate("out.querySelectorAll('[data-fold]').length"), 2,
+    "Both candidates are foldable, including the one with no published setting");
   assert.equal(await evaluate("out.querySelectorAll('.warning').length"), 1,
     "The row with no published setting is listed, and says so");
   assert.deepEqual(await dialNumbers(), ["×"],
     "A same-named row with no setting must not leave a number asserted as exact");
-  await evaluate("out.querySelector('[data-choice]').click()");
+  await evaluate("[...out.querySelectorAll('[data-fold]')].find(b => b.textContent.includes('Nutricia')).click()");
   await settle();
   assert.deepEqual(await dialNumbers(), ["4", "×"],
-    "Choosing resolves the ambiguity and keeps the unavailable sibling as context");
+    "Narrowing resolves the ambiguity and keeps the unavailable sibling as context");
 
   // step 3 is done when the search has resolved, never because it has text.
   await setValue("terr", "United States of America");
@@ -443,6 +469,113 @@ async function main() {
   await settle();
   assert.equal(await evaluate("localStorage.getItem('brezza.lot')"), null,
     "Unticking sweeps the kept lot");
+
+  // ---- adaptive fold: US market with query 'Similac' renders fold rows ----
+  await chooseMachine("advanced");
+  await setValue("terr", "United States of America");
+  await setValue("lot", "");
+  await setValue("q", "Similac", "input");
+  // The invariant is that a fold level shows nothing actionable -- not that it
+  // shows no dial face at all. A row with no published setting renders the red
+  // stop face, and that face is the opposite of an instruction: it is already
+  // how the page says "do not use this".
+  assert.equal(await evaluate("out.querySelectorAll('[data-fold] .dialsvg, [data-fold] .thumb').length"), 0,
+    "A fold row carries no dial face and no product image of its own");
+  assert.deepEqual((await dialNumbers()).filter(text => /^[0-9]+$/.test(text)), [],
+    "A fold level must never show an actionable dial number");
+  const similacTypeRows = await evaluate("out.querySelectorAll('[data-fold]').length");
+  // Every Similac candidate shares the brand, so the brand column is skipped and
+  // the ladder lands on type. Note what this case does NOT show: the US Similac
+  // catalogue is 31 types over 32 candidates, so the fold barely reduces it. The
+  // reduction that matters for this lookup is the market gate (179 candidates
+  // across all markets down to 32), not the fold. The fold earns its keep on
+  // deep catalogues -- see the Nestle NAN case below -- and on the browse path.
+  // Asserted as a property of the data rather than a literal, so a re-crawl that
+  // adds a Similac product does not turn this red.
+  const distinctSimilacTypes = await evaluate(`(() => {
+    const bit = 1n << BigInt(D.T.indexOf("United States of America"));
+    const seen = new Set();
+    D.R.forEach((r, i) => { if ((MASK[i] & bit) && HAY[i].includes("similac")) seen.add(r[1]) });
+    U.forEach((r, i) => { if ((UMASK[i] & bit) && UHAY[i].includes("similac")) seen.add(r[1]) });
+    return seen.size;
+  })()`);
+  assert.equal(similacTypeRows, distinctSimilacTypes,
+    "Similac in the US folds to exactly one row per distinct product type");
+  assert.equal(await evaluate("out.querySelectorAll('.choice').length"), 0,
+    "Similac in US must not render flat choice cards");
+
+  // ---- adaptive fold: exact-field filter prevents substring bleed ----
+  await setValue("terr", "Austria");
+  await setValue("q", "", "input");
+  // A silently-skipped click makes this whole scenario pass without testing
+  // anything, so the helper throws rather than shrugging when the row is absent.
+  const clickFold = async (key, value) => {
+    const clicked = await evaluate(`(() => {
+      const btn = [...document.querySelectorAll('[data-fold=${JSON.stringify(key)}]')]
+        .find(b => b.dataset.val === ${JSON.stringify(value)});
+      if (!btn) return false;
+      btn.click();
+      return true;
+    })()`);
+    assert.equal(clicked, true, `fold row ${key}=${value} was not on the page to click`);
+    await settle();
+  };
+  // Nestlé NAN is not one of the popular twelve, so the brand level is capped
+  // until the expander is taken -- the browse path an owner actually walks.
+  await evaluate("document.querySelector('[data-expand]').click()");
+  await settle();
+  await clickFold("b", "Nestlé NAN");
+  await clickFold("t", "Optipro");
+  // Under Optipro type in Austria, there are exactly 5 stages (1, 2, 3, 4, 5), not 10 from Optipro Plus HMO
+  const optiproStages = await evaluate("out.querySelectorAll('[data-fold=\"s\"]').length");
+  assert.equal(optiproStages, 5,
+    "Picking type Optipro under Nestlé NAN in Austria must show exactly 5 stages, not 10 from Optipro Plus HMO");
+  // Each crumb is two buttons -- the label, which steps back to that level, and
+  // its remove x -- so count crumbs, not elements carrying the attribute.
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 2,
+    "Crumbs must show pinned brand and type");
+
+  // ---- adaptive fold: no fold level ever renders exactly one row ----
+  for (const terr of ["United States of America", "Austria", "Canada", "Germany"]) {
+    await setValue("terr", terr);
+    await setValue("q", "", "input");
+    const count = await evaluate("out.querySelectorAll('[data-fold]').length");
+    if (count > 0) {
+      assert.notEqual(count, 1, `Brand fold level in ${terr} must not have exactly 1 row`);
+    }
+  }
+  await setValue("terr", "United States of America");
+  await setValue("q", "Enfamil", "input");
+  const enfamilTypes = await evaluate("out.querySelectorAll('[data-fold]').length");
+  assert.notEqual(enfamilTypes, 1, "Enfamil type fold level must not have exactly 1 row");
+
+  // ---- adaptive fold: empty query with market selected renders the brand list ----
+  await setValue("terr", "United States of America");
+  // Clear any filter crumbs first
+  await evaluate("(() => { const c = document.querySelector('[data-crumb=\"b\"]'); if (c) c.click(); })()");
+  await settle();
+  await setValue("q", "", "input");
+  const brandRows = await evaluate("out.querySelectorAll('[data-fold=\"b\"]').length");
+  assert.equal(brandRows > 1, true,
+    "An empty query with a market selected must render the brand list");
+  const firstBrand = await evaluate("out.querySelector('[data-fold=\"b\"] .name').textContent");
+  assert.equal(firstBrand, "Enfamil", "Brand list must sort QUICK brands first in QUICK order");
+  const totalUSBrands = await evaluate("new Set(D.R.filter(r => (BigInt('0x'+r[4]) & (1n << BigInt(D.T.indexOf('United States of America')))) !== 0n).map(r => D.B[r[0]])).size");
+  if (totalUSBrands > 12) {
+    assert.equal(brandRows, 12, "Brand list must show at most 12 rows initially");
+    assert.notEqual(await evaluate("out.querySelector('[data-expand=\"brands\"]')"), null,
+      "Brand list with >12 brands must offer an expander");
+    await evaluate("out.querySelector('[data-expand=\"brands\"]').click()");
+    await settle();
+    assert.equal(await evaluate("out.querySelectorAll('[data-fold=\"b\"]').length"), totalUSBrands,
+      "Clicking expander must show all brands");
+  }
+
+  // Clear state for subsequent tests
+  await evaluate("(() => { const c = document.querySelector('[data-crumb=\"b\"]'); if (c) c.click(); })()");
+  await setValue("q", "", "input");
+  await setValue("terr", "");
+  await settle();
 
   // ---- the payload column census ---------------------------------------
   // This block must stay last: it navigates the shared CDP target to an

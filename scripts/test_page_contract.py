@@ -93,11 +93,18 @@ class PageContractTests(unittest.TestCase):
         self.assertIn("which formula matches your container?", template)
         self.assertIn("Do not use a dial setting until", template)
         self.assertIn("Baby Brezza lists this formula but publishes no usable setting", template)
-        # the dial is rendered only for the record `resolveHit` returned, and
-        # that is null until a market, a single candidate, or an explicit
-        # choice settles it
-        self.assertIn("if (resolved == null){", template)
-        self.assertIn("if (chosen != null) return chosen;", template)
+        # The dial is rendered only for the record `resolveHit` returned. Assert
+        # that structurally rather than by quoting a line: the result card must
+        # have exactly one call site, and it must sit inside the resolved
+        # branch. A quoted line only proves someone typed it, which is how the
+        # unavailable-counts-toward-ambiguity rule was once rewritten to match a
+        # regression instead of catching it.
+        call_sites = [m.start() for m in re.finditer(r"(?<!function )\bresultCard\(", template)]
+        self.assertEqual(len(call_sites), 1, "the result card must have one call site")
+        guard = template.rfind("if (resolved != null){", 0, call_sites[0])
+        self.assertNotEqual(guard, -1, "the result card must render under a resolved guard")
+        self.assertNotIn("return", template[guard:call_sites[0]],
+                         "nothing may return out of the resolved guard before the card")
         self.assertIn("const i = resolved;", template)
         self.assertIn("if (!market()", template)
         self.assertIn("Mini never takes this branch", template)
@@ -249,8 +256,16 @@ class PageContractTests(unittest.TestCase):
         exist, so it is listed as context and the page stays in the choice
         state until a real candidate is picked."""
         template = build_page.TEMPLATE
-        self.assertIn("return hits.length + unavailable.length === 1 ? hits[0] : null;",
-                      template)
+        # The rule itself is exercised behaviourally in scripts/test_browser.mjs
+        # ("neocate syneo" in Australia/New Zealand is one hit beside one row
+        # with no published setting). What is checked here is only that the
+        # resolution predicate still consults `unavailable` at all -- dropping
+        # that term is the specific way this rule has been lost before.
+        predicate = template[template.index("const resolveHit ="):]
+        predicate = predicate[:predicate.index(";")]
+        self.assertIn("!unavailable.length", predicate,
+                      "an unresolved sibling with no published setting still blocks resolution")
+        self.assertIn("hits.length === 1", predicate)
         self.assertIn("unavailable.slice(0, MAX).map(unavailableCard).join(\"\")", template)
         self.assertNotIn("unavailable.slice(0, MAX).map(i => choiceCard(i, terms))", template)
         self.assertNotIn("if (hits.length > 1 && chosen == null){", template)
@@ -328,8 +343,11 @@ class PageContractTests(unittest.TestCase):
         self.assertIn("const pinOf = i => { const r = D.R[i]; "
                       "return {b:D.B[r[0]], t:r[1], s:r[2], m:market()} };",
                       template)
-        # restore resolves through the ordinary flow, not from the stored pin
-        self.assertIn("chosen = findPinned(p);", template)
+        # restore resolves through the ordinary flow, not from the stored pin --
+        # now by replaying the pin's exact identity fields into the fold filter
+        # rather than by index, so a pin can never resolve a substring sibling
+        self.assertIn("filter = {b:p.b, t:p.t, s:p.s};", template)
+        self.assertNotIn("chosen", template)
         # the searched query itself still never lands in localStorage
         self.assertIn('tabStore.set("brezza.q", raw)', template)
         self.assertNotIn('store.set("brezza.q"', template)
