@@ -618,6 +618,202 @@ async function main() {
   await setValue("terr", "");
   await settle();
 
+  // ---- reset classes: field clear buttons, start over, forget device ----
+
+  // 1. Start over is absent on a fresh page and present once a search has been typed
+  await evaluate("localStorage.clear(); sessionStorage.clear()");
+  await send("Page.reload", { ignoreCache: true });
+  for (let tries = 0; tries < 40; tries += 1) {
+    try {
+      if (await evaluate("document.readyState === 'complete' && typeof run === 'function'")) break;
+    } catch {}
+    await pause(50);
+  }
+  await settle();
+
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), true,
+    "Start over is absent on a fresh page");
+  assert.equal(await evaluate("document.getElementById('q-clear').hidden"), true,
+    "Search clear button is absent on a fresh page");
+  assert.equal(await evaluate("document.getElementById('terr-clear').hidden"), true,
+    "Market clear button is absent on a fresh page");
+  assert.equal(await evaluate("document.getElementById('lot-clear').hidden"), true,
+    "Lot clear button is absent on a fresh page");
+
+  await chooseMachine("advanced");
+  await setValue("terr", "United States of America");
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), true,
+    "Start over is absent when machine and market are set but no search or filter exists");
+
+  await setValue("q", "Similac", "input");
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), false,
+    "Start over is present once a search has been typed");
+
+  // 2. Start over clears the search box and the crumbs, and leaves machine, market, lot and pins intact
+  // Set up device facts: machine, market, lot (opted in), pinned formula
+  await setValue("lot", "1123ABC", "input");
+  await evaluate("(() => { const k = document.getElementById('lotkeep'); " +
+    "k.checked = true; k.dispatchEvent(new Event('change', {bubbles:true})); })()");
+  await settle();
+  // Pin a formula
+  await setValue("q", "bobbie organic gentle", "input");
+  assert.notEqual(await evaluate("out.querySelector('[data-pinbtn]')"), null);
+  await evaluate("out.querySelector('[data-pinbtn]').click()");
+  await settle();
+  assert.equal(await evaluate("pins.length"), 1, "Formula is pinned");
+
+  // Now create lookup state: search query + fold crumbs
+  await setValue("q", "Similac", "input");
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), false);
+
+  // Click "Start over"
+  await evaluate("document.getElementById('reset').click()");
+  await settle();
+
+  // Assert lookup state is cleared:
+  assert.equal(await evaluate("q.value"), "", "Start over clears the search box");
+  assert.equal(await evaluate("sessionStorage.getItem('brezza.q') || ''"), "",
+    "Start over clears brezza.q in sessionStorage");
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 0,
+    "Start over clears fold crumbs");
+  assert.deepEqual(await evaluate("filter"), {b:null, t:null, s:null},
+    "Start over resets fold filter state");
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), true,
+    "Start over is hidden after clearing lookup state");
+  assert.equal(await evaluate("document.activeElement.id"), "q",
+    "Start over returns focus to the search box");
+
+  // Assert each of the four device facts explicitly:
+  // (a) machine
+  assert.equal(await evaluate("machine"), "advanced", "Start over leaves machine intact");
+  assert.equal(await evaluate("localStorage.getItem('brezza.machine')"), "advanced",
+    "Start over leaves brezza.machine in localStorage intact");
+  // (b) market
+  assert.equal(await evaluate("terr.value"), "United States of America",
+    "Start over leaves market input intact");
+  assert.equal(await evaluate("market()"), "United States of America",
+    "Start over leaves market() intact");
+  assert.equal(await evaluate("localStorage.getItem('brezza.terr')"), "United States of America",
+    "Start over leaves brezza.terr in localStorage intact");
+  // (c) lot
+  assert.equal(await evaluate("lot.value"), "1123ABC", "Start over leaves lot input intact");
+  assert.equal(await evaluate("lotkeep.checked"), true, "Start over leaves lotkeep checked");
+  assert.equal(await evaluate("localStorage.getItem('brezza.lot')"), "1123ABC",
+    "Start over leaves brezza.lot in localStorage intact");
+  assert.equal(await evaluate("sessionStorage.getItem('brezza.lot')"), "1123ABC",
+    "Start over leaves brezza.lot in sessionStorage intact");
+  // (d) pins
+  assert.equal(await evaluate("pins.length"), 1, "Start over leaves pins intact");
+  assert.equal(await evaluate("document.getElementById('pinrow').hidden"), false,
+    "Start over leaves pinned row visible");
+  assert.notEqual(await evaluate("localStorage.getItem('brezza.pins')"), "[]",
+    "Start over leaves brezza.pins in localStorage intact");
+
+  // 3. Each field's clear button empties only its own field
+  // Set all three fields
+  await setValue("q", "Similac", "input");
+  await setValue("terr", "United States of America");
+  await setValue("lot", "1123ABC", "input");
+  assert.equal(await evaluate("document.getElementById('q-clear').hidden"), false);
+  assert.equal(await evaluate("document.getElementById('terr-clear').hidden"), false);
+  assert.equal(await evaluate("document.getElementById('lot-clear').hidden"), false);
+
+  // (a) Lot clear button empties only lot
+  await evaluate("document.getElementById('lot-clear').click()");
+  await settle();
+  assert.equal(await evaluate("lot.value"), "", "Lot clear button empties lot field");
+  assert.equal(await evaluate("document.getElementById('lot-clear').hidden"), true);
+  assert.equal(await evaluate("q.value"), "Similac", "Lot clear button leaves search intact");
+  assert.equal(await evaluate("terr.value"), "United States of America",
+    "Lot clear button leaves market intact");
+  assert.equal(await evaluate("document.activeElement.id"), "lot",
+    "Lot clear button returns focus to lot field");
+
+  // (b) Search clear button empties only search
+  await setValue("lot", "1123ABC", "input");
+  await evaluate("document.getElementById('q-clear').click()");
+  await settle();
+  assert.equal(await evaluate("q.value"), "", "Search clear button empties search field");
+  assert.equal(await evaluate("document.getElementById('q-clear').hidden"), true);
+  assert.equal(await evaluate("terr.value"), "United States of America",
+    "Search clear button leaves market intact");
+  assert.equal(await evaluate("lot.value"), "1123ABC", "Search clear button leaves lot intact");
+  assert.equal(await evaluate("document.activeElement.id"), "q",
+    "Search clear button returns focus to search field");
+
+  // (c) Market clear button empties only market
+  await setValue("q", "Similac", "input");
+  await evaluate("document.getElementById('terr-clear').click()");
+  await settle();
+  assert.equal(await evaluate("terr.value"), "", "Market clear button empties market field");
+  assert.equal(await evaluate("document.getElementById('terr-clear').hidden"), true);
+  assert.equal(await evaluate("q.value"), "Similac", "Market clear button leaves search intact");
+  assert.equal(await evaluate("lot.value"), "1123ABC", "Market clear button leaves lot intact");
+  assert.equal(await evaluate("document.activeElement.id"), "terr",
+    "Market clear button returns focus to market field");
+
+  // 4. Clearing the market also drops the fold crumbs
+  await setValue("q", "", "input");
+  await setValue("terr", "Austria");
+  await evaluate("document.querySelector('[data-expand]').click()");
+  await settle();
+  await clickFold("b", "Nestlé NAN");
+  await clickFold("t", "Optipro");
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 2,
+    "Crumbs present before clearing market");
+  await evaluate("document.getElementById('terr-clear').click()");
+  await settle();
+  assert.equal(await evaluate("terr.value"), "", "Market is cleared");
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 0,
+    "Clearing the market also drops the fold crumbs");
+  assert.deepEqual(await evaluate("filter"), {b:null, t:null, s:null},
+    "Clearing market resets fold filter");
+
+  // 5. Forget this device empties every brezza.* key from BOTH storages and returns the page to the 'Start by choosing your machine' state
+  // Set up all storages with state
+  await chooseMachine("advanced");
+  await setValue("terr", "United States of America");
+  await setValue("lot", "1123ABC", "input");
+  await setValue("q", "Similac", "input");
+  await evaluate("(() => { " +
+    "localStorage.setItem('brezza.theme', 'dark'); " +
+    "localStorage.setItem('brezza.custom_probe', '123'); " +
+    "sessionStorage.setItem('brezza.custom_probe', '456'); " +
+    "})()");
+  assert.equal(await evaluate("machine"), "advanced");
+  assert.equal(await evaluate("pins.length"), 1);
+
+  // Click "Forget this device"
+  await evaluate("document.getElementById('forget').click()");
+  await settle();
+
+  // Check all brezza.* keys are gone from localStorage and sessionStorage
+  const remainingLocalStorageKeys = await evaluate("Object.keys(localStorage).filter(k => k.startsWith('brezza.'))");
+  assert.deepEqual(remainingLocalStorageKeys, [],
+    "Forget this device empties every brezza.* key from localStorage");
+  const remainingSessionStorageKeys = await evaluate("Object.keys(sessionStorage).filter(k => k.startsWith('brezza.'))");
+  assert.deepEqual(remainingSessionStorageKeys, [],
+    "Forget this device empties every brezza.* key from sessionStorage");
+
+  // Check page returned to initial "Start by choosing your machine" state
+  assert.equal(await evaluate("machine"), "", "Forget this device clears machine state");
+  assert.equal(await evaluate("document.querySelectorAll('[data-machine][aria-pressed=\"true\"]').length"), 0,
+    "No machine choice is pressed");
+  assert.equal(await evaluate("lotrow.hidden"), true, "Lot row is hidden");
+  assert.equal(await evaluate("terr.value"), "", "Market input is empty");
+  assert.equal(await evaluate("q.value"), "", "Search input is empty");
+  assert.equal(await evaluate("lot.value"), "", "Lot input is empty");
+  assert.equal(await evaluate("lotkeep.checked"), false, "Lot remember is unchecked");
+  assert.equal(await evaluate("pins.length"), 0, "Pins are cleared");
+  assert.equal(await evaluate("document.getElementById('pinrow').hidden"), true, "Pins row is hidden");
+  assert.match(await evaluate("empty.textContent"), /Start by choosing your machine/,
+    "Page shows 'Start by choosing your machine'");
+  assert.equal(await evaluate("document.getElementById('machine-step').classList.contains('needs')"), true,
+    "Machine step needs selection");
+  assert.equal(await evaluate("document.getElementById('machine-status').textContent"), "Required");
+  assert.equal(await evaluate("document.getElementById('market-status').textContent"), "Required for a setting");
+  assert.equal(await evaluate("document.getElementById('search-status').textContent"), "Brand, formula name, or barcode");
+
   // ---- the payload column census ---------------------------------------
   // This block must stay last: it navigates the shared CDP target to an
   // instrumented copy of the page, so anything asserted after it would be

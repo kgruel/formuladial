@@ -331,6 +331,16 @@ footer a{color:var(--ink-2)}
 }
 .lookuphead{display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:15px}
 .lookuphead h2{font-family:"Zilla Slab",serif;font-size:24px;line-height:1.1;margin:0}
+.lookupactions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.resetbtn{
+  font:inherit; font-family:"IBM Plex Mono",monospace; font-size:10px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink-2);
+  background:transparent; border:1px solid var(--line-2); border-radius:999px;
+  padding:4px 10px; cursor:pointer; white-space:nowrap;
+}
+.resetbtn:hover{color:var(--ink); border-color:var(--ink-3); background:var(--raised)}
+.resetbtn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+.resetbtn[hidden]{display:none}
 .privacytag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:5px 9px;white-space:nowrap}
 .setupgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .step{position:relative;border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--ground);transition:border-color .15s,box-shadow .15s,background .15s}
@@ -351,6 +361,7 @@ footer a{color:var(--ink-2)}
 .machinechoice:hover{border-color:var(--accent)}
 .machinechoice[aria-pressed="true"]{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
 .field{
+  position:relative;
   display:flex; align-items:center; gap:10px;
   background:var(--surface); border:1px solid var(--line-2);
   border-radius:9px; padding:0 12px;
@@ -375,6 +386,12 @@ input,select{
   font:inherit; color:var(--ink); background:transparent; border:0; outline:0;
   width:100%; padding:13px 0;
 }
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration{
+  -webkit-appearance:none;
+  appearance:none;
+  display:none;
+}
 input::placeholder{color:var(--ink-3)}
 .tag{
   font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.12em;
@@ -382,6 +399,7 @@ input::placeholder{color:var(--ink-3)}
   white-space:nowrap; color:var(--accent-ink); background:var(--accent-soft);
 }
 .terr{
+  position:relative;
   display:flex; align-items:center; gap:8px;
   background:var(--surface); border:1px solid var(--line-2);
   border-radius:9px; padding:0 12px;
@@ -392,6 +410,19 @@ input::placeholder{color:var(--ink-3)}
   text-transform:uppercase; color:var(--ink-3); flex:none;
 }
 .terrcombobox{position:relative}
+.clearbtn{
+  position:absolute; top:50%; transform:translateY(-50%);
+  background:transparent; border:0; padding:6px; cursor:pointer;
+  color:var(--ink-3); display:flex; align-items:center; justify-content:center;
+  flex:none; border-radius:6px; z-index:2;
+}
+.clearbtn:hover{color:var(--ink); background:var(--raised)}
+.clearbtn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+.clearbtn[hidden]{display:none}
+#terr-clear{right:40px}
+#lot-clear{right:8px}
+#q-clear{right:12px}
+.field:has(#scan:not([hidden])) #q-clear{right:50px}
 .terrbtn{
   background:transparent; border:0; padding:6px; cursor:pointer;
   color:var(--ink-3); display:flex; align-items:center; justify-content:center;
@@ -680,6 +711,14 @@ ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; ga
   text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-left:6px;
   border:1px solid var(--line-2); color:var(--ink-3); white-space:nowrap;
 }
+.forgetbtn{
+  font:inherit; font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink-2);
+  background:transparent; border:1px solid var(--line-2); border-radius:6px;
+  padding:5px 10px; cursor:pointer; margin-top:4px;
+}
+.forgetbtn:hover{color:var(--stop-ink); border-color:var(--stop); background:var(--stop-soft)}
+.forgetbtn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
 footer{
   margin-top:22px; padding-top:18px; border-top:1px solid var(--line);
   font-size:13px; color:var(--ink-3);
@@ -689,7 +728,7 @@ footer p{margin:10px 0 0}
 @media (max-width:560px){
   .heromark{width:96px;height:96px;margin:12px 0 0}
   .lede{font-size:16px}
-  .controls{padding:15px}.lookuphead{display:block}.privacytag{display:inline-block;margin-top:9px}.setupgrid{grid-template-columns:1fr}.step.searchstep{grid-column:auto}.machinechoices{grid-template-columns:1fr 1fr}
+  .controls{padding:15px}.lookuphead{display:block}.lookupactions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px}.setupgrid{grid-template-columns:1fr}.step.searchstep{grid-column:auto}.machinechoices{grid-template-columns:1fr 1fr}
   .field .tag{display:none}.field .scan{font-size:0;padding:7px}.field .scan svg{width:17px;height:17px}
   .rec{gap:13px; padding:12px 13px}
   .dialsvg{width:52px; height:52px}
@@ -722,7 +761,10 @@ footer p{margin:10px 0 0}
 <section class="controls" id="controls" aria-labelledby="lookup-title">
   <div class="lookuphead">
     <h2 id="lookup-title">Find the right powder setting</h2>
-    <span class="privacytag">Private · on this device</span>
+    <div class="lookupactions">
+      <button class="resetbtn" id="reset" type="button" aria-label="Start over" hidden>Start over</button>
+      <span class="privacytag">Private · on this device</span>
+    </div>
   </div>
   <div class="setupgrid">
     <div class="step" id="machine-step">
@@ -736,6 +778,9 @@ footer p{margin:10px 0 0}
           <label for="lot">Lot no.</label>
           <input id="lot" type="text" maxlength="14" autocomplete="off" spellcheck="false"
                  placeholder="sticker underneath" aria-label="Machine lot number">
+          <button class="clearbtn" id="lot-clear" type="button" aria-label="Clear lot number" hidden>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
         <span class="lotstate" id="lotstate"></span>
         <label class="remember"><input id="lotkeep" type="checkbox"> Remember on this device</label>
@@ -747,6 +792,9 @@ footer p{margin:10px 0 0}
         <div class="terr">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
           <input id="terr" type="search" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="territories" aria-activedescendant="" autocomplete="off" spellcheck="false" placeholder="Search or choose a market…" aria-label="Market where the formula was bought">
+          <button class="clearbtn" id="terr-clear" type="button" aria-label="Clear market" hidden>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
           <button class="terrbtn" id="terrbtn" type="button" aria-label="Show all markets" tabindex="-1" title="Show all markets">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </button>
@@ -763,6 +811,9 @@ footer p{margin:10px 0 0}
         </svg>
         <input id="q" type="search" autocomplete="off" spellcheck="false"
                aria-label="Search by brand, formula name, or barcode">
+        <button class="clearbtn" id="q-clear" type="button" aria-label="Clear search" hidden>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
         <span class="tag" id="mode" hidden>Barcode</span>
         <button class="scan" id="scan" type="button" hidden
                 title="Scan the barcode with your camera — decoded on your device">
@@ -905,6 +956,7 @@ footer p{margin:10px 0 0}
   and a pinned formula keeps only its name, stage, and market &mdash; never the
   setting, which is looked up fresh on every visit. Both live in this browser
   alone.</p>
+  <p><button class="forgetbtn" id="forget" type="button">Forget this device</button></p>
   <p><strong>Historical note:</strong> the discontinued Original Formula Pro is not
   supported by this app. Its frozen crawl is retained only as a research archive;
   none of its values are loaded, searched, or shown here.</p>
@@ -950,7 +1002,9 @@ const $q=el("q"), $terr=el("terr"), $territories=el("territories"), $terrbtn=el(
       $lotstate=el("lotstate"), $machineStep=el("machine-step"),
       $marketStep=el("market-step"), $searchStep=el("search-step"),
       $machineStatus=el("machine-status"), $marketStatus=el("market-status"),
-      $searchStatus=el("search-status");
+      $searchStatus=el("search-status"),
+      $qClear=el("q-clear"), $terrClear=el("terr-clear"), $lotClear=el("lot-clear"),
+      $reset=el("reset"), $forget=el("forget");
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtFullDate(iso){
@@ -984,11 +1038,14 @@ const lotUndecided = r =>
 const store = {
   get(k,d){ try{ return localStorage.getItem(k) ?? d }catch(e){ return d } },
   set(k,v){ try{ localStorage.setItem(k,v) }catch(e){} },
-  remove(k){ try{ localStorage.removeItem(k) }catch(e){} }
+  remove(k){ try{ localStorage.removeItem(k) }catch(e){} },
+  keys(){ try{ return Object.keys(localStorage) }catch(e){ return [] } }
 };
 const tabStore = {
   get(k,d){ try{ return sessionStorage.getItem(k) ?? d }catch(e){ return d } },
-  set(k,v){ try{ sessionStorage.setItem(k,v) }catch(e){} }
+  set(k,v){ try{ sessionStorage.setItem(k,v) }catch(e){} },
+  remove(k){ try{ sessionStorage.removeItem(k) }catch(e){} },
+  keys(){ try{ return Object.keys(sessionStorage) }catch(e){ return [] } }
 };
 // Older builds persisted formula searches without asking. Remove that legacy
 // key once: searches stay session-only, and only an explicit pin or an
@@ -1000,6 +1057,19 @@ if (!["advanced", "mini"].includes(machine)) machine = "";
 let filter = {b:null, t:null, s:null};
 let showAllBrands = false;
 let shownResult = null;
+
+// Lookup state is anything that refines or answers a search: text in the
+// search field, active fold crumbs, or an expanded brand list. Device facts
+// (machine, market, lot, pins) belong to a separate class and survive reset.
+const hasLookupState = () =>
+  !!$q.value.trim() || filter.b != null || filter.t != null || filter.s != null || showAllBrands;
+
+function syncControls(){
+  $qClear.hidden = !$q.value;
+  $terrClear.hidden = !$terr.value;
+  $lotClear.hidden = !$lot.value;
+  $reset.hidden = !hasLookupState();
+}
 
 const COLUMNS = [
   {key:"b", of: r => D.B[r[0]]},
@@ -1486,9 +1556,11 @@ function updateSteps(raw, resolved){
 }
 
 function run(){
+  syncControls();
   const raw = $q.value.trim();
   normalizeLot();
-  tabStore.set("brezza.q", raw);
+  if (raw) tabStore.set("brezza.q", raw);
+  else tabStore.remove("brezza.q");
   if (market()) store.set("brezza.terr", market());
   else if (!$terr.value.trim()) store.remove("brezza.terr");
   if (!machine){
@@ -1649,8 +1721,10 @@ el("foot").innerHTML =
 function normalizeLot(){
   const raw = $lot.value.trim().toUpperCase();
   if ($lot.value !== raw) $lot.value = raw;
-  tabStore.set("brezza.lot", raw);
+  if (raw) tabStore.set("brezza.lot", raw);
+  else tabStore.remove("brezza.lot");
   if ($lotkeep.checked) store.set("brezza.lot", raw);
+  else store.remove("brezza.lot");
 }
 
 // The caption states what the field is doing right now. It cannot call the lot
@@ -1849,7 +1923,75 @@ let timer;
 // say only "no match" -- the same silent-stale-filter trap the market field
 // used to spring.
 const clearFold = () => { filter = {b:null, t:null, s:null}; showAllBrands = false };
-$q.addEventListener("input", () => { clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
+$q.addEventListener("input", () => { syncControls(); clearFold(); clearTimeout(timer); timer = setTimeout(run, 90) });
+
+// Native type="search" clear buttons vary across engines and do not fire
+// input events uniformly, while type="text" lot fields get none. Explicit
+// buttons keep field-clearing consistent and re-run only what changed.
+$qClear.addEventListener("click", () => {
+  $q.value = "";
+  tabStore.set("brezza.q", "");
+  tabStore.remove("brezza.q");
+  clearFold();
+  run();
+  $q.focus();
+});
+$terrClear.addEventListener("click", () => {
+  $terr.value = "";
+  closeTerrList();
+  store.remove("brezza.terr");
+  clearFold();
+  run();
+  $terr.focus();
+});
+$lotClear.addEventListener("click", () => {
+  $lot.value = "";
+  normalizeLot();
+  run();
+  $lot.focus();
+});
+
+// Start over clears the active search and fold narrowing but preserves
+// device facts (machine, market, lot, pins) so parents do not have to
+// re-identify their machine between consecutive bottle lookups.
+$reset.addEventListener("click", () => {
+  $q.value = "";
+  tabStore.set("brezza.q", "");
+  tabStore.remove("brezza.q");
+  clearFold();
+  shownResult = null;
+  run();
+  $q.focus();
+});
+
+// Forget this device purges all device and lookup persistence across
+// both storage tiers, giving a clean first-visit slate without requiring
+// manual field deletion or browser devtools.
+$forget.addEventListener("click", () => {
+  for (const k of store.keys()){
+    if (k.startsWith("brezza.")) store.remove(k);
+  }
+  for (const k of tabStore.keys()){
+    if (k.startsWith("brezza.")) tabStore.remove(k);
+  }
+  ["brezza.machine", "brezza.lot", "brezza.terr", "brezza.pins", "brezza.theme", "brezza.q"].forEach(k => store.remove(k));
+  ["brezza.lot", "brezza.q"].forEach(k => tabStore.remove(k));
+  machine = "";
+  theme = "";
+  applyTheme("");
+  pins = [];
+  renderPins();
+  $lotkeep.checked = false;
+  $lot.value = "";
+  $terr.value = "";
+  closeTerrList();
+  $q.value = "";
+  clearFold();
+  shownResult = null;
+  applyMachine();
+  run();
+});
+
 $terrbtn.addEventListener("click", () => {
   if ($territories.hidden){
     renderTerrList(D.T.map(t => ({ canon: t, alias: null })));
@@ -1861,6 +2003,7 @@ $terrbtn.addEventListener("click", () => {
   }
 });
 $terr.addEventListener("input", () => {
+  syncControls();
   openTerrList();
   clearFold();
   clearTimeout(timer);
