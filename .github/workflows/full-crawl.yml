@@ -56,6 +56,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The browser contract check below needs a global WebSocket, which lands
+      # in Node 22; the runner's default cannot be assumed to have it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install Pillow
         # The one non-stdlib dependency; crawlers/fetch_images.py needs it to
         # cut the committed thumbnails. Every other script is stdlib-only.
@@ -151,6 +157,22 @@ jobs:
               sys.exit("refusing to publish: %s collapsed (%s)" % (", ".join(bad), c))
           print("sanity ok:", c)
           PY
+
+      # Gate the commit, not just the deploy: a rebuild that breaks a contract
+      # should never reach main at all. The sanity check above catches a
+      # collapsed crawl; this catches a snapshot the page cannot honestly
+      # render -- an alias pointing outside the territory table, a payload
+      # column the page stopped reading, a confidence gate that stopped gating.
+      - name: The rebuilt page still honours its contracts
+        if: steps.crawl.outputs.status == 'complete'
+        run: |
+          for candidate in /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -x "$candidate" ]; then export CHROMIUM="$candidate"; break; fi
+          done
+          python3 scripts/test_page_contract.py
+          python3 scripts/test_dataset.py
+          python3 scripts/test_lookup.py
+          node scripts/test_browser.mjs
 
       - name: Commit the snapshot if it moved
         id: commit

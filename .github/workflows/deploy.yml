@@ -21,7 +21,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Publishing is the one action here that reaches a parent at 3am, so it waits
+  # on the suites rather than racing them. They ran in parallel with this
+  # workflow once, which meant a red test could not have stopped a deploy.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
