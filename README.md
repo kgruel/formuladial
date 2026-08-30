@@ -44,11 +44,24 @@ what is and isn't consent-gated — are in
 
 * **3,867 Formula Pro Advanced settings** across 78 markets/territories, searchable by
   brand, formula name, or barcode — typed or scanned with your phone's camera,
-  decoded on-device. Machine, market, and exact-tin steps stay visibly separate
-  so a dial number only appears after all three are resolved.
-* **Searchable markets and inspectable tins.** The market field filters as you
-  type, popular-brand shortcuts remain one click away, and locally served
-  product images enlarge on hover, keyboard focus, click, or tap.
+  decoded on-device — or browsable without typing anything. Machine, market, and
+  exact-tin steps stay visibly separate so a dial number only appears after all
+  three are resolved.
+* **Candidates narrow instead of piling up.** Rather than listing every match at
+  once, the page folds them on the coarsest thing that still tells them apart —
+  brand, then formula, then stage — skipping any level that would offer a single
+  choice. Within one market those three fields are a primary key, so the ladder
+  always ends on exactly one tin. An empty search with a market chosen browses
+  the brand list, which is also where the common brands sit.
+* **Markets you can name the way you say them.** The market box is a real
+  combobox: it takes `USA`, `Poland`, `UK`, `Holland` and 400 other aliases, and
+  rewrites itself to the market it resolved to, so the page never filters by a
+  country it has not shown you. A button opens the full list without typing.
+* **A way back out.** Every field clears on its own, *Start over* drops the
+  current lookup while keeping your machine, market and lot, and *Forget this
+  device* erases everything the page has stored.
+* **Inspectable tins.** Locally served product images enlarge on hover, keyboard
+  focus, click, or tap.
 * **Evidence when a number has moved.** Baby Brezza revises settings with no
   change log or notice. Compared against a frozen ~2022 copy of their own data,
   59 of 276 unambiguous settings had changed — those results carry a struck-out
