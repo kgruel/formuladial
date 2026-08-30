@@ -662,9 +662,29 @@ async function main() {
   await settle();
   assert.equal(await evaluate("pins.length"), 1, "Formula is pinned");
 
+  // Browsing is lookup state too: a market chosen and a brand drilled into, with
+  // nothing typed at all. Start over has to be reachable from there, so the
+  // control's visibility rule must read fold state and not only the search box.
+  await setValue("q", "", "input");
+  await settle();
+  await evaluate("out.querySelector('[data-fold]').click()");
+  await settle();
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 1,
+    "browsing into a fold level pins a crumb");
+  assert.equal(await evaluate("document.getElementById('reset').hidden"), false,
+    "Start over is reachable from the browse path, where nothing has been typed");
+
   // Now create lookup state: search query + fold crumbs
   await setValue("q", "Similac", "input");
   assert.equal(await evaluate("document.getElementById('reset').hidden"), false);
+  // The crumb assertions after Start over are only meaningful if a crumb exists
+  // when it runs. Without this the filter is already empty and they pass on an
+  // empty set -- which is exactly why deleting clearFold() from the handler left
+  // this suite green.
+  await evaluate("out.querySelector('[data-fold]').click()");
+  await settle();
+  assert.equal(await evaluate("document.querySelectorAll('#crumbs .pin').length"), 1,
+    "precondition: a fold crumb is pinned before Start over runs");
 
   // Click "Start over"
   await evaluate("document.getElementById('reset').click()");
